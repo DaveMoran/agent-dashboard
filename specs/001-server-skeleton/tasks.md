@@ -110,8 +110,8 @@ description: "Task list for 001-server-skeleton"
 
 - [x] T029 [US4] Create `src/server/config.ts` exporting `loadConfig(repoPath: string, cwd?: string): Promise<Config>` with `Config = { port: number | undefined; source: string | undefined }`. Search `<repoPath>/agent-visualizer.config.json` first, then `<cwd>/agent-visualizer.config.json` (`cwd` defaults to `process.cwd()`); the first file found wins, no merging; none found returns `{ port: undefined, source: undefined }` silently. The top level must be a JSON object (else `ConfigValueError`); `port`, if present, must be an integer 1-65535; unknown keys are ignored. Throw `ConfigParseError` (message `Invalid JSON in <file>: <parser message>`) and `ConfigValueError` (message `Invalid config in <file>: <reason>`), both extending `AppError`.
 - [x] T030 [US4] Create `tests/config.test.ts` using temp dirs: no file; file in repo only; file in cwd only; both present (repo wins); invalid JSON; array top level; `port: "80"`; `port: 0`; `port: 70000`; unknown key ignored.
-- [ ] T031 [US4] Update `src/cli/index.ts`: call `loadConfig(repo.path)` after resolving the repo; effective port = `--port` value ?? `config.port` ?? `DEFAULT_PORT`.
-- [ ] T032 [US4] Extend `tests/cli.e2e.test.ts`: config with `{"port": <free port>}` is used; `--port` overrides it; malformed config exits 1 with the file path in stderr; config absent uses the default behavior.
+- [x] T031 [US4] Update `src/cli/index.ts`: call `loadConfig(repo.path)` after resolving the repo; effective port = `--port` value ?? `config.port` ?? `DEFAULT_PORT`.
+- [x] T032 [US4] Extend `tests/cli.e2e.test.ts`: config with `{"port": <free port>}` is used; `--port` overrides it; malformed config exits 1 with the file path in stderr; config absent uses the default behavior.
 
 **Checkpoint**: `bun test` passes.
 

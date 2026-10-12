@@ -308,3 +308,62 @@ test("an unwritable state dir exits 1 naming the directory", async () => {
   expect(code).toBe(1);
   expect(stderr).toContain(bad);
 });
+
+const CONFIG_NAME = "agent-visualizer.config.json";
+
+test("config file port is used when no --port is given", async () => {
+  const port = await freePort();
+  fs.writeFileSync(path.join(repoDir, CONFIG_NAME), JSON.stringify({ port }));
+  const { child, out } = await startAndWait([repoDir]);
+  expect(out).toContain(`Listening: http://127.0.0.1:${port}\n`);
+  child.kill("SIGINT");
+  await child.exited;
+});
+
+test("config file in cwd is used when the repo has none", async () => {
+  const port = await freePort();
+  fs.writeFileSync(path.join(tmp, CONFIG_NAME), JSON.stringify({ port })); // spawn cwd is tmp
+  const { child, out } = await startAndWait([repoDir]);
+  expect(out).toContain(`Listening: http://127.0.0.1:${port}\n`);
+  child.kill("SIGINT");
+  await child.exited;
+});
+
+test("--port overrides the config file", async () => {
+  const [configPort, flagPort] = [await freePort(), await freePort()];
+  expect(flagPort).not.toBe(configPort);
+  fs.writeFileSync(path.join(repoDir, CONFIG_NAME), JSON.stringify({ port: configPort }));
+  const { child, out } = await startAndWait([repoDir, "--port", String(flagPort)]);
+  expect(out).toContain(`Listening: http://127.0.0.1:${flagPort}\n`);
+  child.kill("SIGINT");
+  await child.exited;
+});
+
+test("malformed config exits 1 with the file path and starts nothing", async () => {
+  const file = path.join(repoDir, CONFIG_NAME);
+  fs.writeFileSync(file, "{ nope");
+  const { code, stdout, stderr } = await run([repoDir, "--port", String(await freePort())]);
+  expect(code).toBe(1);
+  expect(stdout).toBe("");
+  expect(stderr).toContain(`Invalid JSON in ${file}`);
+  expect(fs.existsSync(path.join(stateDir, "instances"))).toBe(false);
+});
+
+test("invalid config value exits 1 with the file path", async () => {
+  const file = path.join(repoDir, CONFIG_NAME);
+  fs.writeFileSync(file, '{"port": "80"}');
+  const { code, stderr } = await run([repoDir]);
+  expect(code).toBe(1);
+  expect(stderr).toContain(`Invalid config in ${file}`);
+});
+
+test("no config file: the default port 4317 is requested", async () => {
+  // Port 4317 may be busy on this machine; either way the requested port is 4317.
+  const { child, out } = await startAndWait([repoDir]);
+  const actual = Number(out.match(/Listening: http:\/\/127\.0\.0\.1:(\d+)/)?.[1]);
+  child.kill("SIGTERM");
+  await child.exited;
+  const stderr = await new Response(child.stderr as ReadableStream).text();
+  if (actual === 4317) expect(stderr).not.toContain("is in use");
+  else expect(stderr).toContain(`Port 4317 is in use; using ${actual}.`);
+});

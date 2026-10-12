@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { parseCliArgs, usageText } from "../server/args.js";
+import { loadConfig } from "../server/config.js";
 import { DEFAULT_PORT } from "../server/constants.js";
 import { AppError, UsageError } from "../server/errors.js";
 import { resolveRepoPath } from "../server/repo.js";
@@ -28,12 +29,15 @@ async function main(): Promise<void> {
   // parseCliArgs guarantees repoPath unless --help/--version, handled above.
   const repo = await resolveRepoPath(options.repoPath as string);
 
+  const config = await loadConfig(repo.path);
+  const port = options.port ?? config.port ?? DEFAULT_PORT;
+
   const existing = await readInstance(repo.path);
   if (existing && (await isLive(existing))) {
     throw new InstanceRunningError(existing.repoPath, existing.port);
   }
 
-  const server = await startServer({ repo, port: options.port ?? DEFAULT_PORT });
+  const server = await startServer({ repo, port });
   try {
     await writeInstance({
       port: server.port,
