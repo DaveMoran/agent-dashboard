@@ -142,3 +142,61 @@ test("startServer reports a fallback when the requested port is taken", async ()
     await occupier.stop(true);
   }
 });
+
+test("devUi: non-API requests are proxied to the upstream, /api/health stays local", async () => {
+  const seen: string[] = [];
+  const upstream = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: (req) => {
+      const url = new URL(req.url);
+      seen.push(req.method + " " + url.pathname + url.search);
+      if (url.pathname === "/") return new Response("<html>VITE</html>", { headers: { "content-type": "text/html" } });
+      if (url.pathname === "/foo.js") return new Response("export const foo = 1", { headers: { "content-type": "text/javascript" } });
+      if (url.pathname === "/echo") return new Response(`echo:${req.method}`, { status: 201 });
+      if (url.pathname === "/api/health") return new Response("UPSTREAM HEALTH");
+      return new Response("nope", { status: 404 });
+    },
+  });
+  try {
+    // webRoot is empty: if the proxy were skipped, "/" would be a 503.
+    const empty = path.join(tmp, "empty");
+    fs.mkdirSync(empty);
+    const server = await start({ webRoot: empty, devUi: `http://127.0.0.1:${upstream.port}` });
+
+    const index = await fetch(`${server.url}/`);
+    expect(index.status).toBe(200);
+    expect(index.headers.get("content-type")).toContain("text/html");
+    expect(await index.text()).toBe("<html>VITE</html>");
+
+    const js = await fetch(`${server.url}/foo.js?v=1`);
+    expect(js.headers.get("content-type")).toContain("text/javascript");
+    expect(await js.text()).toBe("export const foo = 1");
+
+    const post = await fetch(`${server.url}/echo`, { method: "POST", body: "x" });
+    expect(post.status).toBe(201);
+    expect(await post.text()).toBe("echo:POST");
+
+    expect((await fetch(`${server.url}/missing`)).status).toBe(404);
+
+    const health = await fetch(`${server.url}/api/health`);
+    expect(((await health.json()) as { repoName: string }).repoName).toBe("demo-repo");
+    expect((await fetch(`${server.url}/api/nope`)).status).toBe(404);
+
+    expect(seen).toContain("GET /foo.js?v=1");
+    expect(seen.some((s) => s.includes("/api/"))).toBe(false);
+  } finally {
+    await upstream.stop(true);
+  }
+});
+
+test("devUi unreachable returns 502 with the hint", async () => {
+  const probe = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("x") });
+  const closed = `http://127.0.0.1:${probe.port}`;
+  await probe.stop(true);
+  const server = await start({ devUi: closed });
+  const res = await fetch(`${server.url}/`);
+  expect(res.status).toBe(502);
+  expect(await res.text()).toBe(`Vite dev server unreachable at ${closed}`);
+  expect((await fetch(`${server.url}/api/health`)).status).toBe(200);
+});

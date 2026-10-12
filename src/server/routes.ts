@@ -67,6 +67,35 @@ async function serveStatic(req: Request, url: URL, webRoot: string): Promise<Res
   return new Response("Not Found", { status: 404 });
 }
 
+// fetch() decodes the upstream body, so these headers would no longer describe it.
+const STRIPPED_RESPONSE_HEADERS = ["content-encoding", "content-length", "transfer-encoding"];
+
+async function proxyToDevUi(req: Request, url: URL, devUi: string): Promise<Response> {
+  const headers = new Headers(req.headers);
+  headers.delete("host");
+  const hasBody = req.method !== "GET" && req.method !== "HEAD";
+  try {
+    const upstream = await fetch(new URL(url.pathname + url.search, devUi), {
+      method: req.method,
+      headers,
+      body: hasBody ? req.body : undefined,
+      redirect: "manual",
+    });
+    const responseHeaders = new Headers(upstream.headers);
+    for (const name of STRIPPED_RESPONSE_HEADERS) responseHeaders.delete(name);
+    return new Response(upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: responseHeaders,
+    });
+  } catch {
+    return new Response(`Vite dev server unreachable at ${devUi}`, {
+      status: 502,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+}
+
 export function createHandler(opts: HandlerOptions): (req: Request) => Promise<Response> {
   return async (req) => {
     const url = new URL(req.url);
@@ -87,6 +116,7 @@ export function createHandler(opts: HandlerOptions): (req: Request) => Promise<R
       return Response.json({ error: "not_found" }, { status: 404 });
     }
 
+    if (opts.devUi) return proxyToDevUi(req, url, opts.devUi);
     return serveStatic(req, url, opts.webRoot);
   };
 }
