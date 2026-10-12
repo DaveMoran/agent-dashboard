@@ -37,7 +37,11 @@ async function main(): Promise<void> {
     throw new InstanceRunningError(existing.repoPath, existing.port);
   }
 
-  const server = await startServer({ repo, port });
+  const server = await startServer({
+    repo,
+    port,
+    devUi: process.env.AGENT_VISUALIZER_DEV_UI,
+  });
   try {
     await writeInstance({
       port: server.port,
