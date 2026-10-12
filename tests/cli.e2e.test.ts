@@ -175,3 +175,136 @@ test("--port free: the exact port is used and no fallback message is printed", a
   await child.exited;
   expect(await new Response(child.stderr as ReadableStream).text()).not.toContain("is in use");
 });
+
+function serverJsonPath(): string {
+  const dir = path.join(stateDir, "instances");
+  const entries = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  expect(entries).toHaveLength(1);
+  return path.join(dir, entries[0] as string, "server.json");
+}
+
+async function startAndWait(args: string[], env: Record<string, string> = {}) {
+  const child = spawnCli(args, env);
+  const out = await readUntil(child.stdout as ReadableStream<Uint8Array>, "Listening:");
+  return { child, out };
+}
+
+test("server.json records port, pid, repoPath, startedAt and version", async () => {
+  const port = await freePort();
+  const { child } = await startAndWait([repoDir, "--port", String(port)]);
+  const record = JSON.parse(fs.readFileSync(serverJsonPath(), "utf8"));
+  expect(Object.keys(record).sort()).toEqual(["pid", "port", "repoPath", "startedAt", "version"]);
+  expect(record.port).toBe(port);
+  expect(record.pid).toBe(child.pid);
+  expect(record.repoPath).toBe(repoDir);
+  expect(record.version).toBe(pkg.version);
+  expect(new Date(record.startedAt).toISOString()).toBe(record.startedAt);
+  expect(Date.now() - Date.parse(record.startedAt)).toBeLessThan(30_000);
+  expect(fs.statSync(path.dirname(serverJsonPath())).mode & 0o777).toBe(0o700);
+  child.kill("SIGINT");
+  await child.exited;
+});
+
+test.each(["SIGINT", "SIGTERM"] as const)(
+  "%s removes server.json, frees the port and exits 0",
+  async (signal) => {
+    const port = await freePort();
+    const { child } = await startAndWait([repoDir, "--port", String(port)]);
+    const file = serverJsonPath();
+    expect(fs.existsSync(file)).toBe(true);
+    child.kill(signal);
+    expect(await child.exited).toBe(0);
+    expect(fs.existsSync(file)).toBe(false);
+    await expect(fetch(`http://127.0.0.1:${port}/api/health`)).rejects.toThrow();
+  },
+);
+
+test("a second start for the same repo exits 1 naming the address and leaves the record alone", async () => {
+  const port = await freePort();
+  const { child: first } = await startAndWait([repoDir, "--port", String(port)]);
+  const file = serverJsonPath();
+  const before = fs.readFileSync(file, "utf8");
+
+  const second = await run([repoDir, "--port", String(await freePort())]);
+  expect(second.code).toBe(1);
+  expect(second.stderr).toContain(`already running for ${repoDir}`);
+  expect(second.stderr).toContain(`http://127.0.0.1:${port}`);
+  expect(fs.readFileSync(file, "utf8")).toBe(before);
+  // the first server is unharmed
+  expect((await fetch(`http://127.0.0.1:${port}/api/health`)).status).toBe(200);
+
+  first.kill("SIGINT");
+  expect(await first.exited).toBe(0);
+});
+
+test("a stale record (dead pid) is replaced on start", async () => {
+  const dead = Bun.spawn(["true"]);
+  await dead.exited;
+  // Pre-write the record where the CLI will look for it.
+  const key = (await import("../src/server/state.js")).repoKey(repoDir);
+  const file = path.join(stateDir, "instances", key, "server.json");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      port: 9,
+      pid: dead.pid,
+      repoPath: repoDir,
+      startedAt: "2020-01-01T00:00:00.000Z",
+      version: "0.0.0",
+    }),
+  );
+
+  const port = await freePort();
+  const { child } = await startAndWait([repoDir, "--port", String(port)]);
+  const record = JSON.parse(fs.readFileSync(file, "utf8"));
+  expect(record.pid).toBe(child.pid);
+  expect(record.port).toBe(port);
+  child.kill("SIGINT");
+  await child.exited;
+  expect(fs.existsSync(file)).toBe(false);
+});
+
+function snapshot(root: string): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const full = path.join(dir, entry.name);
+      const stat = fs.lstatSync(full);
+      out.push(`${path.relative(root, full)}\t${entry.isDirectory() ? "dir" : stat.size}\t${stat.mtimeMs}`);
+      if (entry.isDirectory()) walk(full);
+    }
+  };
+  walk(root);
+  return out;
+}
+
+test("the observed repo is untouched by a full start/request/shutdown cycle", async () => {
+  fs.mkdirSync(path.join(repoDir, "src"));
+  fs.writeFileSync(path.join(repoDir, "src", "a.ts"), "export {}");
+  fs.writeFileSync(path.join(repoDir, "README.md"), "# demo");
+  const before = snapshot(repoDir);
+  expect(before.length).toBeGreaterThan(0);
+
+  const port = await freePort();
+  const { child } = await startAndWait([repoDir, "--port", String(port)]);
+  await fetch(`http://127.0.0.1:${port}/api/health`);
+  await fetch(`http://127.0.0.1:${port}/`);
+  expect(snapshot(repoDir)).toEqual(before); // also while running
+  child.kill("SIGINT");
+  expect(await child.exited).toBe(0);
+  expect(snapshot(repoDir)).toEqual(before);
+  // and nothing was written under the repo's parent besides the repo itself
+  expect(stateDir.startsWith(repoDir + path.sep)).toBe(false);
+});
+
+test("an unwritable state dir exits 1 naming the directory", async () => {
+  const blocker = path.join(tmp, "blocker");
+  fs.writeFileSync(blocker, "file");
+  const bad = path.join(blocker, "state");
+  const { code, stderr } = await run([repoDir, "--port", String(await freePort())], {
+    AGENT_VISUALIZER_STATE_DIR: bad,
+  });
+  expect(code).toBe(1);
+  expect(stderr).toContain(bad);
+});
