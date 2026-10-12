@@ -1,4 +1,4 @@
-import { test } from "bun:test";
+import { test, expect } from "bun:test";
 import { parseCliArgs, usageText } from "../src/server/args.js";
 import { UsageError } from "../src/server/errors.js";
 
