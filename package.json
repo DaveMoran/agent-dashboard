@@ -12,7 +12,8 @@
   "scripts": {
     "dev": "bun scripts/dev.ts",
     "build": "vite build",
-    "test": "bun test"
+    "test": "bun test",
+    "verify": "tsc --noEmit && bun test"
   },
   "dependencies": {
     "react": "^18.2.0",
