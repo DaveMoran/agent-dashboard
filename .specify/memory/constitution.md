@@ -15,7 +15,7 @@ Agent Visualizer only observes the target repo, its Claude Code transcripts and 
 Spec framework knowledge (Spec Kit, OpenSpec, BMAD, plain markdown) lives only inside adapters. Core code, ingesters and UI depend on the common spec model, never on a specific framework's file layout.
 
 ### V. Test-Backed and Fixture-Driven
-Logic is covered by `bun test`. Adapters and ingesters are tested against fixtures in `fixtures/`, not against live machine state. A feature's tests must pass before its PR is opened.
+Logic is covered by `bun test`. Adapters and ingesters are tested against fixtures in `fixtures/`, not against live machine state. A feature's tests must pass before its PR is opened. A test must be able to fail: it asserts specific behavior (for example the exact error type and exit code), and breaking the code it covers must make it fail. A test that catches and ignores errors, or only checks that something threw, does not count.
 
 ### VI. Small, Explicit Tasks
 Specs are written so a mid-sized local model can execute them: tasks are small and mechanical, name the files they touch, and state their acceptance check. Prefer simplicity (YAGNI) over cleverness; justify any added dependency in the plan.
@@ -39,8 +39,10 @@ Commit work as it is done, not at the end. Each commit is one logical unit, typi
 4. The PR description summarizes the spec, links the spec directory and lists the documentation updated. A human reviews, commit by commit, and merges.
 
 ## Governance
-This constitution supersedes other practices. Amendments require a PR that updates this file with a version bump and a note explaining why. Every PR review verifies compliance with these principles, and any deviation must be justified in the plan's complexity section.
+This constitution supersedes other practices. Amendments require a PR that updates this file with a version bump and a note explaining why. Every PR review verifies compliance with these principles, and any deviation must be justified in the plan's complexity section. Where practical, the non-negotiable rules are also enforced mechanically rather than by instruction alone: git hooks in `.githooks/` (no commits on `main`, required `[spec-NNN]` tag) and Claude Code settings and hooks in `.claude/` (blocked commands, commit-before-stop for the coder). `CLAUDE.md` holds the short operational form of these rules for agents; this file remains the source of truth.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-12 | **Last Amended**: 2026-10-12
+**Version**: 1.2.0 | **Ratified**: 2026-10-12 | **Last Amended**: 2026-10-12
 
 **Amendment 1.1.0**: Added Principle VII (commit at every workflow step) and Principle VIII (logical, incremental commits) so reviews can isolate each step and each level of logic.
+
+**Amendment 1.2.0**: Principle V now requires tests that can fail (the first coder run produced tests that passed with the code removed). Governance now records mechanical enforcement via `.githooks/` and `.claude/`, and `CLAUDE.md` as the operational summary.
