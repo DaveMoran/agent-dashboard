@@ -1,73 +1,67 @@
-import { promises as fs } from "fs";
-import * as os from "os";
-import * as path from "path";
+import { constants, promises as fs } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { AppError } from "./errors.js";
 
-export class RepoNotFoundError extends AppError {
-  constructor(message: string) {
-    super(message);
-  }
-}
-
-export class RepoNotDirectoryError extends AppError {
-  constructor(message: string) {
-    super(message);
-  }
-}
-
-export class RepoNotReadableError extends AppError {
-  constructor(message: string) {
-    super(message);
-  }
-}
+export class RepoNotFoundError extends AppError {}
+export class RepoNotDirectoryError extends AppError {}
+export class RepoNotReadableError extends AppError {}
 
 export type RepoTarget = {
   path: string;
   name: string;
 };
 
+function errorCode(error: unknown): string | undefined {
+  return typeof error === "object" && error !== null && "code" in error
+    ? String((error as { code: unknown }).code)
+    : undefined;
+}
+
 export async function resolveRepoPath(input: string): Promise<RepoTarget> {
-  // Expand leading ~ to homedir
-  let normalizedPath = input;
-  if (input.startsWith("~")) {
-    normalizedPath = path.join(os.homedir(), input.slice(1));
+  let candidate = input;
+  if (candidate === "~" || candidate.startsWith("~/")) {
+    candidate = path.join(os.homedir(), candidate.slice(1));
   }
+  candidate = path.resolve(process.cwd(), candidate);
 
-  // Resolve relative paths to cwd
-  if (!path.isAbsolute(normalizedPath)) {
-    normalizedPath = path.resolve(process.cwd(), normalizedPath);
-  }
-
-  // Get real path (resolves symlinks)
-  const realPath = await fs.realpath(normalizedPath);
-
-  // Check that it's a directory
-  let stat;
+  let realPath: string;
   try {
-    stat = await fs.stat(realPath);
+    realPath = await fs.realpath(candidate);
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === "ENOENT") {
-      throw new RepoNotFoundError(`Directory not found: ${realPath}`);
+    const code = errorCode(error);
+    if (code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP") {
+      throw new RepoNotFoundError(`Repository path not found: ${candidate}`);
+    }
+    if (code === "EACCES" || code === "EPERM") {
+      throw new RepoNotReadableError(`Repository path is not readable: ${candidate}`);
     }
     throw error;
   }
 
-  if (!stat.isDirectory()) {
-    throw new RepoNotDirectoryError(`Path is not a directory: ${realPath}`);
+  let isDirectory: boolean;
+  try {
+    isDirectory = (await fs.stat(realPath)).isDirectory();
+  } catch (error) {
+    const code = errorCode(error);
+    if (code === "EACCES" || code === "EPERM") {
+      throw new RepoNotReadableError(`Repository path is not readable: ${realPath}`);
+    }
+    throw error;
+  }
+  if (!isDirectory) {
+    throw new RepoNotDirectoryError(`Repository path is not a directory: ${realPath}`);
   }
 
-  // Check that it's readable
   try {
-    await fs.access(realPath, fs.constants.R_OK);
+    await fs.access(realPath, constants.R_OK);
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === "EACCES") {
-      throw new RepoNotReadableError(`Directory is not readable: ${realPath}`);
+    const code = errorCode(error);
+    if (code === "EACCES" || code === "EPERM") {
+      throw new RepoNotReadableError(`Repository path is not readable: ${realPath}`);
     }
     throw error;
   }
 
-  return {
-    path: realPath,
-    name: path.basename(realPath)
-  };
+  return { path: realPath, name: path.basename(realPath) };
 }

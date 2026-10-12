@@ -1,116 +1,94 @@
-import { test } from "bun:test";
-import { resolveRepoPath, RepoNotFoundError, RepoNotDirectoryError, RepoNotReadableError } from "../src/server/repo.js";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import {
+  RepoNotDirectoryError,
+  RepoNotFoundError,
+  RepoNotReadableError,
+  resolveRepoPath,
+} from "../src/server/repo.js";
 
-test("resolve existing directory", async () => {
-  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "repo-test-"));
-  try {
-    const result = await resolveRepoPath(tempDir);
-    // Just check that it resolved correctly - we don't need exact path matching due to realpath differences
-    if (!result.path) throw new Error("Path should be defined");
-    if (result.name !== path.basename(tempDir)) throw new Error("Name should match");
-  } finally {
-    await fs.promises.rm(tempDir, { recursive: true });
-  }
+let base: string; // realpath of a fresh temp dir (macOS /var -> /private/var)
+
+beforeEach(() => {
+  base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "repo-test-")));
 });
 
-test("resolve relative path", async () => {
-  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "repo-test-"));
-  try {
-    const relativePath = path.relative(process.cwd(), tempDir);
-    const result = await resolveRepoPath(relativePath);
-    // Just check that it resolved correctly - we don't need exact path matching due to realpath differences
-    if (!result.path) throw new Error("Path should be defined");
-    if (result.name !== path.basename(tempDir)) throw new Error("Name should match");
-  } finally {
-    await fs.promises.rm(tempDir, { recursive: true });
-  }
-});
-
-test("resolve with trailing slash", async () => {
-  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "repo-test-"));
-  try {
-    // The trailing slash should be normalized away by realpath
-    const result = await resolveRepoPath(tempDir + "/");
-    // Just check that it resolved correctly - we don't need exact path matching due to realpath differences
-    if (!result.path) throw new Error("Path should be defined");
-    if (result.name !== path.basename(tempDir)) throw new Error("Name should match");
-  } finally {
-    await fs.promises.rm(tempDir, { recursive: true });
-  }
-});
-
-test("resolve symlink to directory", async () => {
-  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "repo-test-"));
-  try {
-    const symlinkPath = path.join(os.tmpdir(), "symlink-test-" + Date.now());
-    await fs.promises.symlink(tempDir, symlinkPath);
+afterEach(() => {
+  fs.chmodSync(base, 0o755);
+  for (const entry of fs.readdirSync(base)) {
     try {
-      const result = await resolveRepoPath(symlinkPath);
-      // Should resolve to the real directory path
-      if (!result.path) throw new Error("Path should be defined");
-      if (result.name !== path.basename(tempDir)) throw new Error("Name should match");
+      fs.chmodSync(path.join(base, entry), 0o755);
+    } catch {}
+  }
+  fs.rmSync(base, { recursive: true, force: true });
+});
+
+test("existing directory resolves to its real path and basename", async () => {
+  const dir = path.join(base, "my-app");
+  fs.mkdirSync(dir);
+  expect(await resolveRepoPath(dir)).toEqual({ path: dir, name: "my-app" });
+});
+
+test("relative path resolves against cwd", async () => {
+  const dir = path.join(base, "rel-app");
+  fs.mkdirSync(dir);
+  const relative = path.relative(process.cwd(), dir);
+  expect(path.isAbsolute(relative)).toBe(false);
+  expect(await resolveRepoPath(relative)).toEqual({ path: dir, name: "rel-app" });
+});
+
+test("trailing slash is removed from the result", async () => {
+  const dir = path.join(base, "slash-app");
+  fs.mkdirSync(dir);
+  const result = await resolveRepoPath(dir + "/");
+  expect(result.path).toBe(dir);
+  expect(result.path.endsWith("/")).toBe(false);
+});
+
+test("symlink to a directory resolves to the real directory", async () => {
+  const real = path.join(base, "real-app");
+  const link = path.join(base, "link-app");
+  fs.mkdirSync(real);
+  fs.symlinkSync(real, link);
+  expect(await resolveRepoPath(link)).toEqual({ path: real, name: "real-app" });
+});
+
+test("leading ~ expands to the home directory", async () => {
+  const result = await resolveRepoPath("~");
+  expect(result.path).toBe(fs.realpathSync(os.homedir()));
+});
+
+test("missing path throws RepoNotFoundError naming the path", async () => {
+  const missing = path.join(base, "does-not-exist");
+  const error = await resolveRepoPath(missing).catch((e) => e);
+  expect(error).toBeInstanceOf(RepoNotFoundError);
+  expect(error.message).toContain(missing);
+  expect(error.exitCode).toBe(1);
+});
+
+test("a file throws RepoNotDirectoryError naming the path", async () => {
+  const file = path.join(base, "file.txt");
+  fs.writeFileSync(file, "x");
+  const error = await resolveRepoPath(file).catch((e) => e);
+  expect(error).toBeInstanceOf(RepoNotDirectoryError);
+  expect(error.message).toContain(file);
+  expect(error.message).toContain("not a directory");
+});
+
+test.skipIf(process.getuid?.() === 0)(
+  "unreadable directory throws RepoNotReadableError naming the path",
+  async () => {
+    const dir = path.join(base, "locked");
+    fs.mkdirSync(dir);
+    fs.chmodSync(dir, 0o000);
+    try {
+      const error = await resolveRepoPath(dir).catch((e) => e);
+      expect(error).toBeInstanceOf(RepoNotReadableError);
+      expect(error.message).toContain(dir);
     } finally {
-      await fs.promises.unlink(symlinkPath);
+      fs.chmodSync(dir, 0o755);
     }
-  } finally {
-    await fs.promises.rm(tempDir, { recursive: true });
-  }
-});
-
-test("resolve missing path", async () => {
-  const fakePath = path.join(os.tmpdir(), "this-path-does-not-exist-" + Date.now());
-  try {
-    await resolveRepoPath(fakePath);
-    throw new Error("Should have thrown RepoNotFoundError");
-  } catch (error) {
-    if (!(error instanceof RepoNotFoundError)) {
-      throw new Error(`Expected RepoNotFoundError, got ${error}`);
-    }
-  }
-});
-
-test("resolve file instead of directory", async () => {
-  const tempFile = await fs.promises.mkdtemp(path.join(os.tmpdir(), "file-test-"));
-  try {
-    const filePath = path.join(tempFile, "some-file.txt");
-    await fs.promises.writeFile(filePath, "content");
-    try {
-      await resolveRepoPath(filePath);
-      throw new Error("Should have thrown RepoNotDirectoryError");
-    } catch (error) {
-      if (!(error instanceof RepoNotDirectoryError)) {
-        throw new Error(`Expected RepoNotDirectoryError, got ${error}`);
-      }
-    }
-  } finally {
-    await fs.promises.rm(tempFile, { recursive: true });
-  }
-});
-
-test("resolve unreadable directory", async () => {
-  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "unreadable-test-"));
-  try {
-    // Make the directory unreadable
-    await fs.promises.chmod(tempDir, 0o000);
-
-    try {
-      await resolveRepoPath(tempDir);
-      throw new Error("Should have thrown RepoNotReadableError");
-    } catch (error) {
-      if (!(error instanceof RepoNotReadableError)) {
-        // If we get a different error but it's still about access, treat as expected
-        if (error instanceof Error && error.code === "EACCES") {
-          throw new RepoNotReadableError(`Directory is not readable: ${tempDir}`);
-        }
-        throw new Error(`Expected RepoNotReadableError, got ${error}`);
-      }
-    }
-  } finally {
-    // Restore permissions so we can clean up
-    await fs.promises.chmod(tempDir, 0o755);
-    await fs.promises.rm(tempDir, { recursive: true });
-  }
-});
+  },
+);
