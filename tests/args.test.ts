@@ -1,5 +1,6 @@
 import { test } from "bun:test";
 import { parseCliArgs, usageText } from "../src/server/args.js";
+import { UsageError } from "../src/server/errors.js";
 
 test("valid path only", () => {
   const options = parseCliArgs(["/some/path"]);
@@ -34,71 +35,29 @@ test("version flag", () => {
 });
 
 test("missing path", () => {
-  try {
-    parseCliArgs([]);
-    throw new Error("Should have thrown UsageError");
-  } catch (error) {
-    if (!(error instanceof Error)) throw new Error("Expected UsageError");
-    // We expect this to fail, but we don't check the exact message here
-  }
+  expect(() => parseCliArgs([])).toThrow(UsageError);
 });
 
 test("invalid port - non-numeric", () => {
-  try {
-    parseCliArgs(["/some/path", "--port", "abc"]);
-    throw new Error("Should have thrown UsageError");
-  } catch (error) {
-    if (!(error instanceof Error)) throw new Error("Expected UsageError");
-    // We expect this to fail
-  }
+  expect(() => parseCliArgs(["/some/path", "--port", "abc"])).toThrow(UsageError);
 });
 
 test("invalid port - zero", () => {
-  try {
-    parseCliArgs(["/some/path", "--port", "0"]);
-    throw new Error("Should have thrown UsageError");
-  } catch (error) {
-    if (!(error instanceof Error)) throw new Error("Expected UsageError");
-    // We expect this to fail
-  }
+  expect(() => parseCliArgs(["/some/path", "--port", "0"])).toThrow(UsageError);
 });
 
 test("invalid port - too large", () => {
-  try {
-    parseCliArgs(["/some/path", "--port", "70000"]);
-    throw new Error("Should have thrown UsageError");
-  } catch (error) {
-    if (!(error instanceof Error)) throw new Error("Expected UsageError");
-    // We expect this to fail
-  }
+  expect(() => parseCliArgs(["/some/path", "--port", "70000"])).toThrow(UsageError);
 });
 
 test("invalid port - decimal", () => {
-  try {
-    parseCliArgs(["/some/path", "--port", "12.5"]);
-    throw new Error("Should have thrown UsageError");
-  } catch (error) {
-    if (!(error instanceof Error)) throw new Error("Expected UsageError");
-    // We expect this to fail
-  }
+  expect(() => parseCliArgs(["/some/path", "--port", "12.5"])).toThrow(UsageError);
 });
 
 test("unknown flag", () => {
-  try {
-    parseCliArgs(["/some/path", "--unknown"]);
-    throw new Error("Should have thrown UsageError");
-  } catch (error) {
-    if (!(error instanceof Error)) throw new Error("Expected UsageError");
-    // We expect this to fail
-  }
+  expect(() => parseCliArgs(["/some/path", "--unknown"])).toThrow(UsageError);
 });
 
 test("two positionals", () => {
-  try {
-    parseCliArgs(["/some/path", "/another/path"]);
-    throw new Error("Should have thrown UsageError");
-  } catch (error) {
-    if (!(error instanceof Error)) throw new Error("Expected UsageError");
-    // We expect this to fail
-  }
+  expect(() => parseCliArgs(["/some/path", "/another/path"])).toThrow(UsageError);
 });
