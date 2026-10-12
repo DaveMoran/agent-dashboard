@@ -145,3 +145,33 @@ test("successful start prints the three startup lines and serves health", async 
   });
   child.kill("SIGKILL");
 });
+
+test("--port taken: falls back, says so on stderr, and listens elsewhere", async () => {
+  const occupier = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("x") });
+  const taken = occupier.port as number;
+  try {
+    const child = spawnCli([repoDir, "--port", String(taken)]);
+    const out = await readUntil(child.stdout as ReadableStream<Uint8Array>, "Listening:");
+    const match = out.match(/^Listening: http:\/\/127\.0\.0\.1:(\d+)$/m);
+    expect(match).not.toBeNull();
+    const actual = Number((match as RegExpMatchArray)[1]);
+    expect(actual).not.toBe(taken);
+    expect((await fetch(`http://127.0.0.1:${actual}/api/health`)).status).toBe(200);
+    child.kill("SIGTERM");
+    await child.exited;
+    const stderr = await new Response(child.stderr as ReadableStream).text();
+    expect(stderr).toContain(`Port ${taken} is in use; using ${actual}.`);
+  } finally {
+    await occupier.stop(true);
+  }
+});
+
+test("--port free: the exact port is used and no fallback message is printed", async () => {
+  const port = await freePort();
+  const child = spawnCli([repoDir, "--port", String(port)]);
+  const out = await readUntil(child.stdout as ReadableStream<Uint8Array>, "Listening:");
+  expect(out).toContain(`Listening: http://127.0.0.1:${port}\n`);
+  child.kill("SIGTERM");
+  await child.exited;
+  expect(await new Response(child.stderr as ReadableStream).text()).not.toContain("is in use");
+});

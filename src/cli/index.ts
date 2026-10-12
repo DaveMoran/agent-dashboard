@@ -22,6 +22,9 @@ async function main(): Promise<void> {
   const repo = await resolveRepoPath(options.repoPath as string);
   const server = await startServer({ repo, port: options.port ?? DEFAULT_PORT });
 
+  if (server.fellBack) {
+    console.error(`Port ${server.requestedPort} is in use; using ${server.port}.`);
+  }
   console.log(`Agent Visualizer ${version}`);
   console.log(`Observing: ${repo.path}`);
   console.log(`Listening: ${server.url}`);

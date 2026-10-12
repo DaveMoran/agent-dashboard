@@ -124,3 +124,21 @@ test("empty webRoot returns 503 with the build hint", async () => {
   // the API keeps working without a UI build
   expect((await fetch(`${server.url}/api/health`)).status).toBe(200);
 });
+
+test("startServer reports a fallback when the requested port is taken", async () => {
+  const occupier = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("x") });
+  try {
+    const server = await startServer({
+      repo: { path: repoDir, name: "demo-repo" },
+      port: occupier.port as number,
+      webRoot,
+    });
+    stops.push(server.stop);
+    expect(server.fellBack).toBe(true);
+    expect(server.requestedPort).toBe(occupier.port as number);
+    expect(server.port).not.toBe(occupier.port);
+    expect((await fetch(`${server.url}/api/health`)).status).toBe(200);
+  } finally {
+    await occupier.stop(true);
+  }
+});

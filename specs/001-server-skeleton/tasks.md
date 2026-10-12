@@ -78,9 +78,9 @@ description: "Task list for 001-server-skeleton"
 
 - [x] T019 [US2] Create `src/server/port.ts` exporting `listenWithFallback<T>(requestedPort: number, listen: (port: number) => T): { server: T; fellBack: boolean }`. Call `listen(requestedPort)`; if it throws an error whose `code === "EADDRINUSE"` (also accept a message containing "EADDRINUSE" or "in use"), call `listen(0)` so the OS picks a free port and return `fellBack: true`. Rethrow any other error.
 - [x] T020 [US2] Create `tests/port.test.ts`: occupy a port with `Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("x") })`, call `listenWithFallback` with that port, assert `fellBack === true` and the new server's port differs; with a free port assert `fellBack === false` and the port matches; non-EADDRINUSE errors are rethrown. Stop all servers in `finally`.
-- [ ] T021 [US2] Update `src/server/start.ts` to use `listenWithFallback` around `Bun.serve`, and extend its return value with `requestedPort: number` and `fellBack: boolean`.
-- [ ] T022 [US2] Update `src/cli/index.ts`: when `fellBack` is true, print `Port <requested> is in use; using <actual>.` to stderr before the three startup lines.
-- [ ] T023 [US2] Extend `tests/cli.e2e.test.ts`: occupy a port, start the CLI with `--port <that port>`, assert stderr contains the fallback message and "Listening" shows a different port; start with a free `--port` and assert the exact port is used.
+- [x] T021 [US2] Update `src/server/start.ts` to use `listenWithFallback` around `Bun.serve`, and extend its return value with `requestedPort: number` and `fellBack: boolean`.
+- [x] T022 [US2] Update `src/cli/index.ts`: when `fellBack` is true, print `Port <requested> is in use; using <actual>.` to stderr before the three startup lines.
+- [x] T023 [US2] Extend `tests/cli.e2e.test.ts`: occupy a port, start the CLI with `--port <that port>`, assert stderr contains the fallback message and "Listening" shows a different port; start with a free `--port` and assert the exact port is used.
 
 **Checkpoint**: `bun test` passes.
 

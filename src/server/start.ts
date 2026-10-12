@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import { HOST } from "./constants.js";
+import { listenWithFallback } from "./port.js";
 import type { RepoTarget } from "./repo.js";
 import { createHandler } from "./routes.js";
 import { version } from "./version.js";
@@ -13,6 +14,8 @@ export type StartOptions = {
 
 export type RunningServer = {
   port: number;
+  requestedPort: number;
+  fellBack: boolean;
   url: string;
   stop: () => Promise<void>;
 };
@@ -20,19 +23,20 @@ export type RunningServer = {
 const DEFAULT_WEB_ROOT = path.resolve(import.meta.dir, "../../dist/web");
 
 export async function startServer(opts: StartOptions): Promise<RunningServer> {
-  const server = Bun.serve({
-    hostname: HOST,
-    port: opts.port,
-    fetch: createHandler({
-      repo: opts.repo,
-      version,
-      webRoot: opts.webRoot ?? DEFAULT_WEB_ROOT,
-      devUi: opts.devUi,
-    }),
+  const fetch = createHandler({
+    repo: opts.repo,
+    version,
+    webRoot: opts.webRoot ?? DEFAULT_WEB_ROOT,
+    devUi: opts.devUi,
   });
+  const { server, fellBack } = listenWithFallback(opts.port, (port) =>
+    Bun.serve({ hostname: HOST, port, fetch }),
+  );
   const port = server.port as number;
   return {
     port,
+    requestedPort: opts.port,
+    fellBack,
     url: `http://${HOST}:${port}`,
     stop: async () => {
       await server.stop(true);
