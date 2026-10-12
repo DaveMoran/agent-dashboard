@@ -20,6 +20,12 @@ Logic is covered by `bun test`. Adapters and ingesters are tested against fixtur
 ### VI. Small, Explicit Tasks
 Specs are written so a mid-sized local model can execute them: tasks are small and mechanical, name the files they touch, and state their acceptance check. Prefer simplicity (YAGNI) over cleverness; justify any added dependency in the plan.
 
+### VII. Commit at Every Workflow Step (NON-NEGOTIABLE)
+Each Spec Kit step (`specify`, `clarify`, `plan`, `tasks`, `analyze`/`checklist`, `implement`) ends with its output committed to the feature branch. Before starting any step, the agent MUST check that the previous step's files are committed (`git status` shows no uncommitted changes under `specs/NNN-*/` or `.specify/`). If they are not, the agent switches to the feature branch (creating it from `main` if it does not exist) and commits them first, before doing any new work, so that these commits are the earliest on the branch. Never carry a previous step's uncommitted files into the next step.
+
+### VIII. Logical, Incremental Commits (NON-NEGOTIABLE)
+Commit work as it is done, not at the end. Each commit is one logical unit, typically a single task or a few tightly related tasks from `tasks.md`, with its tests, and leaves the test suite passing where practicable. Do not mix unrelated changes in one commit, and do not batch a whole feature into a single closing commit. Documentation updates are committed with the change they describe or as their own clearly labeled commit. The goal is that a reviewer can read the PR commit by commit and isolate each level of logic. Every commit message is imperative, describes what the commit does, and ends with the `[spec-NNN]` tag; spec-workflow commits use the form `docs(spec-NNN): add <artifact> [spec-NNN]` (for example `docs(spec-001): add specification [spec-001]`).
+
 ## Technology Constraints
 - TypeScript in strict mode throughout.
 - Bun for the runtime, package management and tests.
@@ -27,12 +33,14 @@ Specs are written so a mid-sized local model can execute them: tasks are small a
 - Local-only: no network calls, telemetry or accounts.
 
 ## Development Workflow
-1. Planner (Claude, plan mode) writes the spec, plan and tasks on the feature branch.
-2. Coder (Qwen via Claude Code) implements the tasks on the same branch, checking each box in `tasks.md` as it completes it and tagging commits with `[spec-NNN]`.
+1. Planner (Claude, plan mode) writes the spec, plan and tasks on the feature branch. Before each step it verifies the previous step's files are committed, and it commits its own output when the step finishes (Principle VII).
+2. Coder (Qwen via Claude Code) implements the tasks on the same branch, checking each box in `tasks.md` as it completes it and committing logical units as it goes, each tagged `[spec-NNN]` (Principle VIII).
 3. Before opening the PR: tests pass, documentation task is complete, and the README and `docs/` reflect the change.
-4. The PR description summarizes the spec, links the spec directory and lists the documentation updated. A human reviews and merges.
+4. The PR description summarizes the spec, links the spec directory and lists the documentation updated. A human reviews, commit by commit, and merges.
 
 ## Governance
 This constitution supersedes other practices. Amendments require a PR that updates this file with a version bump and a note explaining why. Every PR review verifies compliance with these principles, and any deviation must be justified in the plan's complexity section.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-12 | **Last Amended**: 2026-10-12
+**Version**: 1.1.0 | **Ratified**: 2026-10-12 | **Last Amended**: 2026-10-12
+
+**Amendment 1.1.0**: Added Principle VII (commit at every workflow step) and Principle VIII (logical, incremental commits) so reviews can isolate each step and each level of logic.
