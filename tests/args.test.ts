@@ -1,63 +1,96 @@
-import { test, expect } from "bun:test";
+import { expect, test } from "bun:test";
 import { parseCliArgs, usageText } from "../src/server/args.js";
 import { UsageError } from "../src/server/errors.js";
 
+function usageError(argv: string[]): UsageError {
+  try {
+    parseCliArgs(argv);
+  } catch (error) {
+    expect(error).toBeInstanceOf(UsageError);
+    return error as UsageError;
+  }
+  throw new Error(`parseCliArgs(${JSON.stringify(argv)}) did not throw`);
+}
+
 test("valid path only", () => {
-  const options = parseCliArgs(["/some/path"]);
-  if (!options.repoPath) throw new Error("repoPath should be defined");
-  if (options.port !== undefined) throw new Error("port should be undefined");
-  if (options.help !== false) throw new Error("help should be false");
-  if (options.version !== false) throw new Error("version should be false");
+  expect(parseCliArgs(["/some/path"])).toEqual({
+    repoPath: "/some/path",
+    port: undefined,
+    help: false,
+    version: false,
+  });
 });
 
-test("path plus --port", () => {
-  const options = parseCliArgs(["/some/path", "--port", "4400"]);
-  if (!options.repoPath) throw new Error("repoPath should be defined");
-  if (options.port !== 4400) throw new Error("port should be 4400");
-  if (options.help !== false) throw new Error("help should be false");
-  if (options.version !== false) throw new Error("version should be false");
+test("path plus --port 4400", () => {
+  expect(parseCliArgs(["/some/path", "--port", "4400"])).toEqual({
+    repoPath: "/some/path",
+    port: 4400,
+    help: false,
+    version: false,
+  });
 });
 
-test("help flag", () => {
-  const options = parseCliArgs(["--help"]);
-  if (options.repoPath !== undefined) throw new Error("repoPath should be undefined");
-  if (options.port !== undefined) throw new Error("port should be undefined");
-  if (options.help !== true) throw new Error("help should be true");
-  if (options.version !== false) throw new Error("version should be false");
+test("--port accepts the boundaries 1 and 65535", () => {
+  expect(parseCliArgs(["/p", "--port", "1"]).port).toBe(1);
+  expect(parseCliArgs(["/p", "--port", "65535"]).port).toBe(65535);
 });
 
-test("version flag", () => {
-  const options = parseCliArgs(["--version"]);
-  if (options.repoPath !== undefined) throw new Error("repoPath should be undefined");
-  if (options.port !== undefined) throw new Error("port should be undefined");
-  if (options.help !== false) throw new Error("help should be false");
-  if (options.version !== true) throw new Error("version should be true");
+test("--help needs no path", () => {
+  expect(parseCliArgs(["--help"])).toEqual({
+    repoPath: undefined,
+    port: undefined,
+    help: true,
+    version: false,
+  });
 });
 
-test("missing path", () => {
-  expect(() => parseCliArgs([])).toThrow(UsageError);
+test("--version needs no path", () => {
+  expect(parseCliArgs(["--version"])).toEqual({
+    repoPath: undefined,
+    port: undefined,
+    help: false,
+    version: true,
+  });
 });
 
-test("invalid port - non-numeric", () => {
-  expect(() => parseCliArgs(["/some/path", "--port", "abc"])).toThrow(UsageError);
+test("missing path is a UsageError with exit code 2", () => {
+  const error = usageError([]);
+  expect(error.exitCode).toBe(2);
+  expect(error.message).toContain("Missing repository path");
 });
 
-test("invalid port - zero", () => {
-  expect(() => parseCliArgs(["/some/path", "--port", "0"])).toThrow(UsageError);
+test.each([
+  ["abc", "abc"],
+  ["0", "0"],
+  ["70000", "70000"],
+  ["12.5", "12.5"],
+  ["-1", "-1"],
+  ["", "Invalid port value"],
+])("--port %p is rejected and the message names the value", (value, expected) => {
+  const error = usageError(["/some/path", "--port", value]);
+  expect(error.exitCode).toBe(2);
+  expect(error.message).toContain(expected);
+  expect(error.message).toContain("Invalid port value");
 });
 
-test("invalid port - too large", () => {
-  expect(() => parseCliArgs(["/some/path", "--port", "70000"])).toThrow(UsageError);
+test("--port without a value is a UsageError", () => {
+  expect(usageError(["/some/path", "--port"]).exitCode).toBe(2);
 });
 
-test("invalid port - decimal", () => {
-  expect(() => parseCliArgs(["/some/path", "--port", "12.5"])).toThrow(UsageError);
+test("unknown flag is a UsageError naming the flag", () => {
+  const error = usageError(["/some/path", "--unknown"]);
+  expect(error.exitCode).toBe(2);
+  expect(error.message).toContain("--unknown");
 });
 
-test("unknown flag", () => {
-  expect(() => parseCliArgs(["/some/path", "--unknown"])).toThrow(UsageError);
+test("two positionals is a UsageError", () => {
+  const error = usageError(["/some/path", "/another/path"]);
+  expect(error.exitCode).toBe(2);
+  expect(error.message).toContain("Too many positional arguments");
 });
 
-test("two positionals", () => {
-  expect(() => parseCliArgs(["/some/path", "/another/path"])).toThrow(UsageError);
+test("usage text documents the contract's synopsis and exit codes", () => {
+  expect(usageText).toContain("Usage: agent-visualizer <repo-path> [--port <n>]");
+  expect(usageText).toContain("--help | --version");
+  expect(usageText).toContain("Exit codes:");
 });

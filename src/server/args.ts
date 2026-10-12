@@ -25,6 +25,14 @@ Exit codes:
 Every non-zero exit prints a single message to stderr that names the specific problem and, for "already running", the existing address (http://127.0.0.1:<port>).`;
 
 export function parseCliArgs(argv: string[]): CliOptions {
+  // parseArgs refuses option values that start with "-" and its message does not
+  // name the value, so catch negative numbers here.
+  const portAt = argv.indexOf("--port");
+  const next = portAt >= 0 ? argv[portAt + 1] : undefined;
+  if (next !== undefined && /^-\d/.test(next)) {
+    throw new UsageError(`Invalid port value: ${next}. Port must be between 1 and 65535.`);
+  }
+
   try {
     const { values, positionals } = parseArgs({
       args: argv,
