@@ -1,0 +1,14 @@
+#!/bin/sh
+# Constitution Principle VIII: commits on a spec branch (NNN-name) must end with the matching [spec-NNN] tag.
+branch=$(git symbolic-ref --short -q HEAD || true)
+num=$(printf '%s' "$branch" | sed -n 's/^\([0-9][0-9][0-9]\)-.*/\1/p')
+[ -z "$num" ] && exit 0   # not a spec branch (e.g. chore/..., docs/...): no tag required
+first=$(sed -n '1p' "$1")
+case "$first" in Merge\ *|Revert\ *|fixup!*|squash!*) exit 0 ;; esac
+# Accept the tag at the end of the subject line or as its own trailing line (before any Co-Authored-By trailer).
+if grep -Eq "\[spec-$num\][[:space:]]*$" "$1" || grep -Eq "^\[spec-$num\]$" "$1"; then
+  exit 0
+fi
+echo "commit-msg: commits on branch '$branch' must end the subject line with [spec-$num]." >&2
+echo "  Example: feat(spec-$num): add port fallback [spec-$num]" >&2
+exit 1

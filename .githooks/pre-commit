@@ -1,0 +1,8 @@
+#!/bin/sh
+# Constitution Principle I: never commit directly to main.
+branch=$(git symbolic-ref --short -q HEAD || true)
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo "pre-commit: refusing to commit on '$branch'. Switch to a feature branch (NNN-feature-name). See .specify/memory/constitution.md, Principle I." >&2
+  exit 1
+fi
+exit 0
