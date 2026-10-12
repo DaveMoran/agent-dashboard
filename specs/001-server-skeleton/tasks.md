@@ -141,7 +141,7 @@ description: "Task list for 001-server-skeleton"
 - [x] T039 Update `docs/master-spec.md`: add rows to the Decisions table for default port 4317, state directory `~/.agent-visualizer/instances/<repo-key>/server.json`, loopback-only binding, and dev mode (Bun server proxies HTTP to Vite, HMR direct); mention the double-agent launcher will read `server.json`. Keep the rest unchanged.
 - [x] T040 Walk through every scenario in `specs/001-server-skeleton/quickstart.md`; fix any code or any doc/command in the quickstart that does not match actual behavior.
 - [x] T041 Run `bun run verify` (type check + tests) and `bun run build`; both must pass with no errors. Fix failures before continuing.
-- [ ] T042 Confirm `git status` shows no stray files (no `node_modules`, `dist`, temp files), check off every task above, and commit remaining work with a message ending in `[spec-001]`.
+- [x] T042 Confirm `git status` shows no stray files (no `node_modules`, `dist`, temp files), check off every task above, and commit remaining work with a message ending in `[spec-001]`.
 - [ ] T043 Push `001-server-skeleton` and open a pull request to `main` with `gh pr create`. PR description: summary of the spec, link to `specs/001-server-skeleton/`, list of documentation updated (T038, T039), and results of T037/T040. If no git remote is configured, STOP and tell the human instead of creating one.
 
 ---
