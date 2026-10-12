@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(brew *)",
+      "Bash(sudo *)",
+      "Bash(npm install -g *)",
+      "Bash(npm i -g *)",
+      "Bash(bun add -g *)",
+      "Bash(git commit *--no-verify*)",
+      "Bash(git push *--force*)",
+      "Bash(git push origin main*)",
+      "Write(**/IMPLEMENTATION_*.md)",
+      "Write(**/*SUMMARY*.md)",
+      "Write(**/*STOPPED*.md)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require-commit.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
