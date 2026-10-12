@@ -20,6 +20,10 @@ The tool is **dogfooded**: built with the same Claude-planner + Qwen-coder pair 
 | Adapters | Spec Kit first (end-to-end with both views), then Plain-markdown, OpenSpec, BMAD |
 | Attribution | Spec status transitions + `[spec-NNN]` commit tags + git branch |
 | Spec location | Owned per adapter (auto-detected), overridable in config |
+| Default port | `4317`; `--port` > `agent-visualizer.config.json` > default. If taken, fall back to a free port and say so |
+| State directory | `~/.agent-visualizer/instances/<repo-key>/server.json` (override root with `AGENT_VISUALIZER_STATE_DIR`); never inside the observed repo. The upcoming double-agent launcher skill reads `server.json` to find a running instance |
+| Network binding | Loopback only (`127.0.0.1`) |
+| Dev mode | `bun run dev` runs Vite and the Bun server; the Bun server proxies HTTP to Vite and Vite's HMR WebSocket connects directly to the Vite port (5173) |
 
 ## Architecture
 ```
