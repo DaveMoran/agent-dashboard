@@ -24,11 +24,12 @@ Rules for both are in `CLAUDE.md` (short) and `.specify/memory/constitution.md` 
 export AV_CTX=98304   # context window; restart both helpers after changing
 unalias ollama-serve 2>/dev/null
 ollama-serve() { caffeinate -ims env OLLAMA_CONTEXT_LENGTH=${AV_CTX:-98304} OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0 ollama serve "$@"; }
-claude-coder() { caffeinate -ims env AV_ROLE=coder CLAUDE_CODE_MAX_CONTEXT_TOKENS=${AV_CTX:-98304} ollama launch claude --model qwen3-coder:30b "$@"; }
+claude-coder() { caffeinate -ims env AV_ROLE=coder CLAUDE_CODE_MAX_CONTEXT_TOKENS=${AV_CTX:-98304} ollama launch claude --model qwen3-coder:30b -- --permission-mode acceptEdits "$@"; }
 ```
 
 - `ollama-serve` starts the server with a large context window, flash attention and an 8-bit KV cache. Quit the Ollama menu-bar app first or the port is taken.
 - `claude-coder` starts the coder session. `AV_ROLE=coder` turns on the Stop hook (`.claude/hooks/require-commit.sh`), which blocks the session from ending with uncommitted work. The planner session does not set it.
+- `--permission-mode acceptEdits` auto-approves file edits, and Bash commands are allowed by the `allow` list in `.claude/settings.json` (the `deny` list always wins). Do not use auto mode with the local model: auto mode asks the model to vet every Bash command, that call timed out on the local model ("auto mode cannot determine the safety of Bash"), and the coder could not run `bun install`. A command not on the allow list pauses at a prompt until you answer; add it to the list if it is safe.
 - `caffeinate -ims` keeps the Mac from sleeping while they run. Keep the machine plugged in with the lid open; a sleeping Mac stalls the in-flight model request (a first run lost about three hours this way).
 
 ## Why the large context window
