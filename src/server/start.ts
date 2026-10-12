@@ -1,22 +1,41 @@
+import * as path from "node:path";
+import { HOST } from "./constants.js";
+import type { RepoTarget } from "./repo.js";
 import { createHandler } from "./routes.js";
-import { parseCliArgs } from "./args.js";
+import { version } from "./version.js";
 
-async function main() {
-  const args = parseCliArgs(process.argv.slice(2));
+export type StartOptions = {
+  repo: RepoTarget;
+  port: number;
+  webRoot?: string;
+  devUi?: string;
+};
 
-  const handler = await createHandler(args.path);
+export type RunningServer = {
+  port: number;
+  url: string;
+  stop: () => Promise<void>;
+};
 
-  // In a real implementation, this would start the server
-  console.log(`Starting server for repository: ${args.path}`);
-  console.log(`Listening on port ${args.port}`);
+const DEFAULT_WEB_ROOT = path.resolve(import.meta.dir, "../../dist/web");
 
-  // For now, we just return the handler
-  return handler;
+export async function startServer(opts: StartOptions): Promise<RunningServer> {
+  const server = Bun.serve({
+    hostname: HOST,
+    port: opts.port,
+    fetch: createHandler({
+      repo: opts.repo,
+      version,
+      webRoot: opts.webRoot ?? DEFAULT_WEB_ROOT,
+      devUi: opts.devUi,
+    }),
+  });
+  const port = server.port as number;
+  return {
+    port,
+    url: `http://${HOST}:${port}`,
+    stop: async () => {
+      await server.stop(true);
+    },
+  };
 }
-
-// If this file is run directly, execute main
-if (import.meta.main) {
-  main().catch(console.error);
-}
-
-export { main };
