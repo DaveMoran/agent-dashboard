@@ -29,11 +29,11 @@ description: "Task list for 001-server-skeleton"
 
 **Purpose**: Project initialization
 
-- [ ] T001 Run `bun --version` and confirm it prints 1.2.0 or higher. If `bun` is not found or older, STOP and ask the human to install it (e.g. `brew install oven-sh/bun/bun`); do not install it yourself.
-- [ ] T002 Create `package.json`: `"name": "agent-visualizer"`, `"version": "0.1.0"`, `"private": true`, `"type": "module"`, `"engines": { "bun": ">=1.2.0" }`, `"bin": { "agent-visualizer": "./src/cli/index.ts" }`, scripts `"dev": "bun scripts/dev.ts"`, `"build": "vite build"`, `"test": "bun test"`. Add dependencies `react`, `react-dom` and devDependencies `vite`, `@vitejs/plugin-react`, `typescript`, `@types/bun`, `@types/react`, `@types/react-dom` (use `bun add` / `bun add -d` to install).
-- [ ] T003 [P] Create `tsconfig.json`: `"strict": true`, `"target": "ES2022"`, `"module": "ESNext"`, `"moduleResolution": "bundler"`, `"jsx": "react-jsx"`, `"types": ["bun"]`, `"noEmit": true`, `"resolveJsonModule": true`, `"skipLibCheck": true`, `"include": ["src", "tests", "scripts", "vite.config.ts"]`.
-- [ ] T004 [P] Create `.gitignore` containing `node_modules/`, `dist/`, `.DS_Store`, `*.log`.
-- [ ] T005 Create `vite.config.ts`: use `@vitejs/plugin-react`; `root: "src/web"`; `build: { outDir: "../../dist/web", emptyOutDir: true }`; `server: { port: 5173, strictPort: true, host: "127.0.0.1", hmr: { host: "127.0.0.1", port: 5173 } }`.
+- [x] T001 Run `bun --version` and confirm it prints 1.2.0 or higher. If `bun` is not found or older, STOP and ask the human to install it (e.g. `brew install oven-sh/bun/bun`); do not install it yourself.
+- [x] T002 Create `package.json`: `"name": "agent-visualizer"`, `"version": "0.1.0"`, `"private": true`, `"type": "module"`, `"engines": { "bun": ">=1.2.0" }`, `"bin": { "agent-visualizer": "./src/cli/index.ts" }`, scripts `"dev": "bun scripts/dev.ts"`, `"build": "vite build"`, `"test": "bun test"`. Add dependencies `react`, `react-dom` and devDependencies `vite`, `@vitejs/plugin-react`, `typescript`, `@types/bun`, `@types/react`, `@types/react-dom` (use `bun add` / `bun add -d` to install).
+- [x] T003 [P] Create `tsconfig.json`: `"strict": true`, `"target": "ES2022"`, `"module": "ESNext"`, `"moduleResolution": "bundler"`, `"jsx": "react-jsx"`, `"types": ["bun"]`, `"noEmit": true`, `"resolveJsonModule": true`, `"skipLibCheck": true`, `"include": ["src", "tests", "scripts", "vite.config.ts"]`.
+- [x] T004 [P] Create `.gitignore` containing `node_modules/`, `dist/`, `.DS_Store`, `*.log`.
+- [x] T005 Create `vite.config.ts`: use `@vitejs/plugin-react`; `root: "src/web"`; `build: { outDir: "../../dist/web", emptyOutDir: true }`; `server: { port: 5173, strictPort: true, host: "127.0.0.1", hmr: { host: "127.0.0.1", port: 5173 } }`.
 
 ---
 
@@ -41,10 +41,10 @@ description: "Task list for 001-server-skeleton"
 
 **Purpose**: Shared building blocks every story uses
 
-- [ ] T006 [P] Create `src/server/version.ts` exporting `export const version: string` imported from `../../package.json` (`import pkg from "../../package.json"`), and `src/server/constants.ts` exporting `export const DEFAULT_PORT = 4317`, `export const HOST = "127.0.0.1"`, and `export const CONFIG_FILE_NAME = "agent-visualizer.config.json"`.
-- [ ] T007 [P] Create `src/server/errors.ts`: `export class AppError extends Error { exitCode = 1 }` and `export class UsageError extends AppError { exitCode = 2 }`. All later error classes extend one of these so the CLI can map them to exit codes (1 runtime, 2 usage).
-- [ ] T008 Create `src/server/args.ts` exporting `parseCliArgs(argv: string[]): CliOptions` and `usageText: string`, using `parseArgs` from `node:util` in strict mode. `CliOptions = { repoPath: string | undefined; port: number | undefined; help: boolean; version: boolean }` per `data-model.md`. Rules: `--port` must be an integer 1-65535 (reject non-numeric, decimals, 0, negatives, >65535 by throwing `UsageError` naming the bad value); unknown flags throw `UsageError`; missing `<repo-path>` throws `UsageError` unless `--help` or `--version` is set; more than one positional throws `UsageError`. Usage text follows `contracts/cli.md`.
-- [ ] T009 Create `tests/args.test.ts` covering: valid path only; path plus `--port 4400`; `--help`; `--version`; missing path; `--port abc`; `--port 0`; `--port 70000`; `--port 12.5`; unknown flag; two positionals.
+- [x] T006 [P] Create `src/server/version.ts` exporting `export const version: string` imported from `../../package.json` (`import pkg from "../../package.json"`), and `src/server/constants.ts` exporting `export const DEFAULT_PORT = 4317`, `export const HOST = "127.0.0.1"`, and `export const CONFIG_FILE_NAME = "agent-visualizer.config.json"`.
+- [x] T007 [P] Create `src/server/errors.ts`: `export class AppError extends Error { exitCode = 1 }` and `export class UsageError extends AppError { exitCode = 2 }`. All later error classes extend one of these so the CLI can map them to exit codes (1 runtime, 2 usage).
+- [x] T008 Create `src/server/args.ts` exporting `parseCliArgs(argv: string[]): CliOptions` and `usageText: string`, using `parseArgs` from `node:util` in strict mode. `CliOptions = { repoPath: string | undefined; port: number | undefined; help: boolean; version: boolean }` per `data-model.md`. Rules: `--port` must be an integer 1-65535 (reject non-numeric, decimals, 0, negatives, >65535 by throwing `UsageError` naming the bad value); unknown flags throw `UsageError`; missing `<repo-path>` throws `UsageError` unless `--help` or `--version` is set; more than one positional throws `UsageError`. Usage text follows `contracts/cli.md`.
+- [x] T009 Create `tests/args.test.ts` covering: valid path only; path plus `--port 4400`; `--help`; `--version`; missing path; `--port abc`; `--port 0`; `--port 70000`; `--port 12.5`; unknown flag; two positionals.
 
 **Checkpoint**: `bun test tests/args.test.ts` passes.
 
