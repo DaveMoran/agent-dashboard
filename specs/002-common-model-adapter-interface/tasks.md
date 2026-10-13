@@ -26,8 +26,8 @@ description: "Task list for 002-common-model-adapter-interface"
 
 ## Phase 1: Setup
 
-- [ ] T001 Run `git branch --show-current` (expect `002-common-model-adapter-interface`) and `bun run verify` (expect all 99 existing tests to pass) to confirm a green baseline before any change.
-- [ ] T002 In `tsconfig.json`, add `"fixtures"` to the top-level `include` array so fixture code is type-checked. Run `bunx tsc --noEmit`.
+- [x] T001 Run `git branch --show-current` (expect `002-common-model-adapter-interface`) and `bun run verify` (expect all 99 existing tests to pass) to confirm a green baseline before any change.
+- [x] T002 In `tsconfig.json`, add `"fixtures"` to the top-level `include` array so fixture code is type-checked. Run `bunx tsc --noEmit`.
 
 ---
 
