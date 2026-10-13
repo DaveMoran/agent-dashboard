@@ -10,13 +10,37 @@ export type ScanResult =
   | { ok: true; snapshot: Snapshot }
   | { ok: false; error: { stage: ScanStage; message: string } };
 
-export function isIgnoredPath(rel: string): boolean {
-  const p = "/" + rel.split(path.sep).join("/");
-  return p.includes("/.git/") || p.includes("/node_modules/");
-}
-
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+const PRUNED_DIRS = new Set([".git", "node_modules"]);
+
+/** Relative paths (using "/") of every file under root, never entering pruned dirs. */
+async function walk(root: string, issues: Issue[]): Promise<string[]> {
+  const files: string[] = [];
+  async function visit(dir: string, rel: string): Promise<void> {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch (err) {
+      issues.push({
+        kind: "unreadable-path",
+        message: `Cannot read ${dir}: ${messageOf(err)}`,
+      });
+      return;
+    }
+    for (const entry of entries) {
+      const childRel = rel === "" ? entry.name : `${rel}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (!PRUNED_DIRS.has(entry.name)) await visit(path.join(dir, entry.name), childRel);
+      } else if (entry.isFile()) {
+        files.push(childRel);
+      }
+    }
+  }
+  await visit(root, "");
+  return files;
 }
 
 export function emptySnapshot(adapter: string | null = null): Snapshot {
@@ -41,32 +65,10 @@ export async function scan(
   const issues: Issue[] = [];
   const files = new Set<string>();
   for (const target of targets) {
-    try {
-      await readdir(target.root);
-    } catch (err) {
-      issues.push({
-        kind: "unreadable-path",
-        message: `Cannot read ${target.root}: ${messageOf(err)}`,
-      });
-      continue;
-    }
-    for (const pattern of target.patterns) {
-      try {
-        const glob = new Bun.Glob(pattern);
-        for await (const rel of glob.scan({
-          cwd: target.root,
-          onlyFiles: true,
-          dot: true,
-        })) {
-          if (isIgnoredPath(rel)) continue;
-          files.add(path.join(target.root, rel));
-        }
-      } catch (err) {
-        issues.push({
-          kind: "unreadable-path",
-          message: `Cannot scan ${target.root} for "${pattern}": ${messageOf(err)}`,
-        });
-      }
+    const relFiles = await walk(target.root, issues);
+    const globs = target.patterns.map((p) => new Bun.Glob(p));
+    for (const rel of relFiles) {
+      if (globs.some((g) => g.match(rel))) files.add(path.join(target.root, rel));
     }
   }
 

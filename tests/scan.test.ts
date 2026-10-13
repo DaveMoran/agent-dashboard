@@ -120,4 +120,42 @@ describe("scan", () => {
       }
     },
   );
+
+  test.skipIf(process.getuid?.() === 0)(
+    "an unreadable subfolder is skipped individually and named in one issue",
+    async () => {
+      const root = await copyFixture("stub/repo-a");
+      const locked = path.join(root, "locked");
+      await mkdir(locked);
+      await chmod(locked, 0o000);
+      try {
+        const adapter = createStubAdapter({ patterns: ["**/*.json"] });
+        const snap = await okSnapshot(await scan(adapter, { roots: [root] }));
+        expect(snap.specs.map((s) => s.id)).toEqual(["001", "002", "003"]);
+        expect(snap.issues).toHaveLength(1);
+        expect(snap.issues[0]!.kind).toBe("unreadable-path");
+        expect(snap.issues[0]!.message).toContain(locked);
+      } finally {
+        await chmod(locked, 0o755);
+      }
+    },
+  );
+
+  test.skipIf(process.getuid?.() === 0)(
+    "an unreadable folder inside node_modules is pruned, so it produces no issue",
+    async () => {
+      const root = await copyFixture("stub/repo-a");
+      const locked = path.join(root, "node_modules", "locked");
+      await mkdir(locked, { recursive: true });
+      await chmod(locked, 0o000);
+      try {
+        const adapter = createStubAdapter({ patterns: ["**/*.json"] });
+        const snap = await okSnapshot(await scan(adapter, { roots: [root] }));
+        expect(snap.specs.map((s) => s.id)).toEqual(["001", "002", "003"]);
+        expect(snap.issues).toEqual([]);
+      } finally {
+        await chmod(locked, 0o755);
+      }
+    },
+  );
 });
