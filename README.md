@@ -148,9 +148,9 @@ docs/                  Master spec, feature seeds, local setup
 
 ## Contributing
 
-Work is done by two agent sessions: a **planner** (Claude, plan mode) that writes specs, and a **local coder** (Qwen via Ollama through Claude Code) that implements them. They hand off through the spec files in `specs/`. Setup, shell helpers and guardrails are in [`docs/local-setup.md`](docs/local-setup.md); the project principles are in [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
+Work is done by two agent sessions: a **planner** (Claude, plan mode) that writes specs, and a **coder** that implements them. The coder is currently Claude Sonnet; a local model (Qwen3-Coder via Ollama through Claude Code) also works for small, explicit tasks, with the setup and its limits described in [`docs/local-setup.md`](docs/local-setup.md). They hand off through the spec files in `specs/`. Setup, shell helpers and guardrails are in [`docs/local-setup.md`](docs/local-setup.md); the project principles are in [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
 
 - One feature branch (`NNN-feature-name`) and one pull request per spec. Never commit to `main`.
 - Commit one logical unit at a time; every commit subject ends with `[spec-NNN]`.
-- Enable the repo's git hooks once per clone: `git config core.hooksPath .githooks` (refuses commits and pushes on `main` and requires the `[spec-NNN]` tag). `main` is also protected on GitHub, so every change goes through a pull request..
+- Enable the repo's git hooks once per clone: `git config core.hooksPath .githooks` (refuses commits and pushes on `main` and requires the `[spec-NNN]` tag). `main` is also protected on GitHub, so every change goes through a pull request.
 - Run `bun run verify` before calling a task done.
