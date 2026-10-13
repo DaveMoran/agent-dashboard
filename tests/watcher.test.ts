@@ -218,6 +218,18 @@ describe("watchSpecs", () => {
     expect(s.watcher.current().specs.find((x) => x.id === "001")!.title).toBe("During initial");
   });
 
+  test("stop() during a slow scan emits no notification once it resolves", async () => {
+    const root = await copyFixture("stub/repo-a");
+    const adapter = createStubAdapter({ parseDelayMs: 800 });
+    const s = await startSettled([root], { adapter }, 1000);
+    s.drain();
+    await editTitle(root, "001.json", "Mid-scan stop");
+    await sleep(500); // debounce has fired; the scan is waiting in parse
+    await s.watcher.stop();
+    expect(s.drain()).toEqual([]);
+    expect(await s.quiet(1200)).toEqual([]);
+  });
+
   test("a failing first scan emits error with an empty snapshot", async () => {
     const root = await copyFixture("stub/repo-a");
     await writeFile(spec(root, "001.json"), "FAIL");
