@@ -1,5 +1,5 @@
-import type { Issue, Spec, SpecSource, SpecStatus, Task } from "./model";
-import { STATUSES } from "./model";
+import type { Event, Issue, Role, Spec, SpecSource, SpecStatus, Task } from "./model";
+import { ROLES, STATUSES } from "./model";
 
 type Raw = Record<string, unknown>;
 
@@ -304,4 +304,35 @@ export function validateSpecs(raw: unknown[]): { specs: Spec[]; issues: Issue[] 
     specs,
     issues: [...issues, ...duplicateIssues, ...dependencyIssues(specs)],
   };
+}
+
+export type EventResult = { ok: true; event: Event } | { ok: false; reason: string };
+
+export function validateEvent(raw: unknown): EventResult {
+  if (!isRecord(raw)) {
+    return { ok: false, reason: `event must be an object, got ${describe(raw)}` };
+  }
+  if (typeof raw.ts !== "string" || Number.isNaN(Date.parse(raw.ts))) {
+    return { ok: false, reason: `"ts" must be a date string, got ${describe(raw.ts)}` };
+  }
+  if (typeof raw.role !== "string" || !(ROLES as readonly string[]).includes(raw.role)) {
+    return {
+      ok: false,
+      reason: `"role" must be one of ${ROLES.join(", ")}, got ${describe(raw.role)}`,
+    };
+  }
+  if (!isNonEmptyString(raw.kind)) {
+    return { ok: false, reason: `"kind" must be a non-empty string, got ${describe(raw.kind)}` };
+  }
+  if (raw.specId !== undefined && typeof raw.specId !== "string") {
+    return { ok: false, reason: `"specId" must be a string, got ${describe(raw.specId)}` };
+  }
+  const event: Event = {
+    ts: raw.ts,
+    role: raw.role as Role,
+    kind: raw.kind,
+    detail: raw.detail,
+  };
+  if (raw.specId !== undefined) event.specId = raw.specId;
+  return { ok: true, event };
 }
