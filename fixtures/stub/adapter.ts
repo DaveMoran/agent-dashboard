@@ -6,6 +6,8 @@ export interface StubOptions {
   name?: string;
   detect?: boolean | "throw";
   patterns?: string[];
+  /** Wait this long after reading the files and before parsing them. */
+  parseDelayMs?: number;
 }
 
 async function isDir(p: string): Promise<boolean> {
@@ -33,9 +35,14 @@ export function createStubAdapter(options: StubOptions = {}): Adapter {
       return ctx.roots.map((root) => ({ root, patterns: [...patterns] }));
     },
     async parse(ctx: RepoContext, files: string[]) {
+      const texts: string[] = [];
+      for (const file of files) texts.push(await readFile(file, "utf8"));
+      if (options.parseDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.parseDelayMs));
+      }
       const out: unknown[] = [];
-      for (const file of files) {
-        const text = await readFile(file, "utf8");
+      for (const [i, file] of files.entries()) {
+        const text = texts[i]!;
         if (text.trim() === "FAIL") {
           throw new Error(`stub parse failure in ${file}`);
         }

@@ -170,6 +170,30 @@ describe("watchSpecs", () => {
     expect(s.watcher.current().specs.find((x) => x.id === "003")!.title).toBe("Fixed");
   });
 
+  test("a change written while a scan is in flight yields a later spec-changed with the new content", async () => {
+    const root = await copyFixture("stub/repo-a");
+    const adapter = createStubAdapter({ parseDelayMs: 500 });
+    const s = await startSettled([root], { adapter });
+    s.drain();
+    await editTitle(root, "001.json", "A");
+    await sleep(400); // the scan for "A" has read its files and is waiting to parse
+    await editTitle(root, "001.json", "B");
+
+    const titles: string[] = [];
+    const deadline = Date.now() + 5000;
+    while (!titles.includes("B") && Date.now() < deadline) {
+      const n = await s.next(3000);
+      expect(n.type).toBe("spec-changed");
+      if (n.type === "spec-changed") {
+        titles.push(n.snapshot.specs.find((x) => x.id === "001")!.title);
+      }
+    }
+    expect(titles[0]).toBe("A"); // the in-flight scan saw the old content
+    expect(titles[titles.length - 1]).toBe("B");
+    expect(titles.length).toBeGreaterThanOrEqual(2);
+    expect(s.watcher.current().specs.find((x) => x.id === "001")!.title).toBe("B");
+  });
+
   test("a failing first scan emits error with an empty snapshot", async () => {
     const root = await copyFixture("stub/repo-a");
     await writeFile(spec(root, "001.json"), "FAIL");
