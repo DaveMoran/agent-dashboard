@@ -6,7 +6,7 @@ export interface RepoContext {
 export interface WatchTarget {
   /** One of ctx.roots. */
   root: string;
-  /** Globs relative to root, e.g. "specs/*/spec.md". */
+  // Globs relative to root, e.g. "specs/<dir>/spec.md".
   patterns: string[];
 }
 
