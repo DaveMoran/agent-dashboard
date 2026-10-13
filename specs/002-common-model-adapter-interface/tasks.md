@@ -112,7 +112,7 @@ description: "Task list for 002-common-model-adapter-interface"
 **Independent Test**: `tests/model.test.ts`.
 
 - [x] T021 [US5] Add `validateEvent(raw: unknown)` to `src/core/validate.ts` returning `{ ok: true; event: Event }` or `{ ok: false; reason: string }`: `ts` must be a string that `Date.parse` accepts; `role` must be in `ROLES`; `kind` a non-empty string; `specId`, if present, a string; `detail` passed through. `reason` names the failing field.
-- [ ] T022 [US5] Create `tests/model.test.ts`: `STATUSES` and `ROLES` equal the exact lists; a valid event of each role is accepted with and without `specId`; missing `ts`, `ts: "yesterday"`, `role: "robot"`, empty `kind` and numeric `specId` are each rejected with a reason naming the field.
+- [x] T022 [US5] Create `tests/model.test.ts`: `STATUSES` and `ROLES` equal the exact lists; a valid event of each role is accepted with and without `specId`; missing `ts`, `ts: "yesterday"`, `role: "robot"`, empty `kind` and numeric `specId` are each rejected with a reason naming the field.
 
 ---
 
