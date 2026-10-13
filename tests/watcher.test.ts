@@ -68,9 +68,12 @@ async function start(
 }
 
 /** Start, take the initial notification, and let any stale OS events settle. */
-async function startSettled(roots: string[], extra = {}): Promise<Session> {
+async function startSettled(roots: string[], extra = {}, settleMs = 400): Promise<Session> {
   const s = await start(roots, extra);
-  await sleep(400);
+  // Keep waiting until a whole window passes with no (stale) notification.
+  do {
+    await sleep(settleMs);
+  } while (s.drain().length > 0);
   return s;
 }
 
@@ -173,7 +176,7 @@ describe("watchSpecs", () => {
   test("a change written while a scan is in flight yields a later spec-changed with the new content", async () => {
     const root = await copyFixture("stub/repo-a");
     const adapter = createStubAdapter({ parseDelayMs: 500 });
-    const s = await startSettled([root], { adapter });
+    const s = await startSettled([root], { adapter }, 1000);
     s.drain();
     await editTitle(root, "001.json", "A");
     await sleep(400); // the scan for "A" has read its files and is waiting to parse
@@ -192,6 +195,27 @@ describe("watchSpecs", () => {
     expect(titles[titles.length - 1]).toBe("B");
     expect(titles.length).toBeGreaterThanOrEqual(2);
     expect(s.watcher.current().specs.find((x) => x.id === "001")!.title).toBe("B");
+  });
+
+  test("a change during the initial scan shows up without any further change", async () => {
+    const root = await copyFixture("stub/repo-a");
+    const adapter = createStubAdapter({ parseDelayMs: 800 });
+    const pending = start([root], { adapter });
+    await sleep(300); // the initial scan has read its files and is waiting to parse
+    await editTitle(root, "001.json", "During initial");
+    const s = await pending;
+
+    const first = await s.next();
+    expect(first.type).toBe("initial");
+    if (first.type === "initial") {
+      expect(first.snapshot.specs.find((x) => x.id === "001")!.title).toBe("First");
+    }
+    const followUp = await s.next(3000);
+    expect(followUp.type).toBe("spec-changed");
+    if (followUp.type === "spec-changed") {
+      expect(followUp.snapshot.specs.find((x) => x.id === "001")!.title).toBe("During initial");
+    }
+    expect(s.watcher.current().specs.find((x) => x.id === "001")!.title).toBe("During initial");
   });
 
   test("a failing first scan emits error with an empty snapshot", async () => {

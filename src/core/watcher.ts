@@ -52,6 +52,9 @@ export async function watchSpecs(options: WatchOptions): Promise<SpecWatcher> {
   let stopped = false;
   let scanning: Promise<void> | null = null;
   let rescan = false;
+  let initialising = true;
+  let discovered = false;
+  let dirtyDuringInitial = false;
   let quietTimer: ReturnType<typeof setTimeout> | null = null;
   let maxTimer: ReturnType<typeof setTimeout> | null = null;
   const watchers: FSWatcher[] = [];
@@ -63,6 +66,7 @@ export async function watchSpecs(options: WatchOptions): Promise<SpecWatcher> {
     discover: async (c) => {
       const found = await adapter.discover(c);
       targets = found;
+      discovered = true;
       return found;
     },
   };
@@ -120,6 +124,10 @@ export async function watchSpecs(options: WatchOptions): Promise<SpecWatcher> {
 
   function onChange(): void {
     if (stopped) return;
+    if (initialising) {
+      dirtyDuringInitial = true;
+      return;
+    }
     if (quietTimer) clearTimeout(quietTimer);
     quietTimer = setTimeout(fire, debounceMs);
     if (!maxTimer) maxTimer = setTimeout(fire, maxWaitMs);
@@ -128,6 +136,7 @@ export async function watchSpecs(options: WatchOptions): Promise<SpecWatcher> {
   function relevant(root: string, filename: string | null): boolean {
     if (filename === null) return true;
     if (inIgnoredDir(filename)) return false;
+    if (!discovered) return true; // patterns not known yet: be safe
     const rel = filename.split(path.sep).join("/");
     for (const target of targets) {
       if (target.root !== root) continue;
@@ -144,10 +153,8 @@ export async function watchSpecs(options: WatchOptions): Promise<SpecWatcher> {
     onChange();
   }
 
-  // Initial scan first, so `targets` is known before OS watchers start.
-  await runScan("initial");
-
-  if (adapter !== null) {
+  function startWatchers(): void {
+    if (adapter === null) return;
     for (const root of ctx.roots) {
       try {
         const w = watch(root, { recursive: true }, (_event, filename) => {
@@ -163,6 +170,13 @@ export async function watchSpecs(options: WatchOptions): Promise<SpecWatcher> {
       }
     }
   }
+
+  // Start the OS watchers before the initial scan so no change is missed. Events that
+  // arrive during that scan are remembered and answered with one follow-up scan.
+  startWatchers();
+  await runScan("initial");
+  initialising = false;
+  if (dirtyDuringInitial) trigger();
 
   return {
     current: () => current,
