@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 import { parseCliArgs, usageText } from "../server/args.js";
+import { adapters } from "../adapters/index.js";
+import { assertKnownAdapter, createRegistry } from "../core/registry.js";
 import { loadConfig } from "../server/config.js";
 import { DEFAULT_PORT } from "../server/constants.js";
 import { AppError, UsageError } from "../server/errors.js";
@@ -31,6 +33,7 @@ async function main(): Promise<void> {
 
   const config = await loadConfig(repo.path);
   const port = options.port ?? config.port ?? DEFAULT_PORT;
+  assertKnownAdapter(config.adapter, createRegistry(adapters));
 
   const existing = await readInstance(repo.path);
   if (existing && (await isLive(existing))) {

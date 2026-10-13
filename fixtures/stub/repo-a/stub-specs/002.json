@@ -1,0 +1,1 @@
+{"id":"002","title":"Second","status":"planned","dependsOn":["001"],"artifacts":["stub-specs/002.json"],"branch":"002-second","tasks":[{"id":"T1","text":"Do a","done":true,"phase":"Setup"},{"id":"T2","text":"Do b","done":false,"parallel":true},{"id":"T3","text":"Do c","done":false}],"extra":"ignored"}

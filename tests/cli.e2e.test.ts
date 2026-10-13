@@ -357,6 +357,39 @@ test("invalid config value exits 1 with the file path", async () => {
   expect(stderr).toContain(`Invalid config in ${file}`);
 });
 
+test("unknown adapter in config exits 1 and starts no server", async () => {
+  fs.writeFileSync(path.join(repoDir, CONFIG_NAME), '{"adapter":"nope"}');
+  const { code, stdout, stderr } = await run([repoDir, "--port", String(await freePort())]);
+  expect(code).toBe(1);
+  expect(stdout).toBe("");
+  expect(stderr).toContain('Unknown adapter "nope". Available adapters: none registered');
+  expect(fs.existsSync(path.join(stateDir, "instances"))).toBe(false);
+});
+
+test("non-string adapter in config exits 1 with the invalid-config message", async () => {
+  const file = path.join(repoDir, CONFIG_NAME);
+  fs.writeFileSync(file, '{"adapter":5}');
+  const { code, stdout, stderr } = await run([repoDir]);
+  expect(code).toBe(1);
+  expect(stdout).toBe("");
+  expect(stderr).toContain(
+    `Invalid config in ${file}: "adapter" must be a non-empty string, got 5`,
+  );
+});
+
+test("a config without an adapter key still prints exactly the three startup lines", async () => {
+  const port = await freePort();
+  fs.writeFileSync(path.join(repoDir, CONFIG_NAME), JSON.stringify({ port }));
+  const child = spawnCli([repoDir]);
+  const out = await readUntil(child.stdout as ReadableStream<Uint8Array>, "Listening:");
+  child.kill("SIGKILL");
+  expect(out.trimEnd().split("\n")).toEqual([
+    `Agent Visualizer ${pkg.version}`,
+    `Observing: ${repoDir}`,
+    `Listening: http://127.0.0.1:${port}`,
+  ]);
+});
+
 test("no config file: the default port 4317 is requested", async () => {
   // Port 4317 may be busy on this machine; either way the requested port is 4317.
   const { child, out } = await startAndWait([repoDir]);

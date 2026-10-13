@@ -22,6 +22,7 @@ The tool is **dogfooded**: built with the same Claude-planner + Qwen-coder pair 
 | Spec location | Owned per adapter (auto-detected), overridable in config |
 | Coder model | Claude Sonnet is the coder for open-ended tasks. A local Qwen3-Coder-30B (Ollama) handled small explicit edits but shipped stubs and misreported progress on multi-step tasks, so it is limited to narrow, test-backed work. Spec 001 was built with Sonnet |
 | Worktrees | Planner and coder may run in separate git worktrees of one repo (so each can be on its own branch at the same time). The visualizer treats all worktrees of a repo as one project (identified by the git common dir) and merges their specs and transcripts. Handled in specs 003-005. |
+| Watching | Recursive watch per root, filtered by adapter patterns; 150 ms quiet period, 2 s maximum delay; full snapshot per notification |
 | Default port | `4317`; `--port` > `agent-visualizer.config.json` > default. If taken, fall back to a free port and say so |
 | State directory | `~/.agent-visualizer/instances/<repo-key>/server.json` (override root with `AGENT_VISUALIZER_STATE_DIR`); never inside the observed repo. The upcoming double-agent launcher skill reads `server.json` to find a running instance |
 | Network binding | Loopback only (`127.0.0.1`) |
@@ -39,7 +40,7 @@ git log / branches ──► Git ingester ────────────�
 - `status ∈ drafted | planned | ready | in-progress | review | done | blocked`
 - `Event { ts, role: planner|coder|human|git, specId?, kind: spec-created|status-change|task-checked|file-edit|bash|test-run|commit|prompt, detail }`
 
-**Adapter contract:** `detect(repo) → bool`, `discover(repo) → paths/globs to watch`, `parse(files) → Spec[]`. Status derivation per framework:
+**Adapter contract:** `detect(repo) → bool`, `discover(repo) → paths/globs to watch`, `parse(files) → Spec[]` (details in [`adapters.md`](adapters.md)). Status derivation per framework:
 - *Spec Kit:* `specs/NNN-feature/` — spec.md only → drafted; +plan.md → planned; +tasks.md → ready; some boxes checked → in-progress; all checked → review; branch merged → done. Feature branch `NNN-feature` gives attribution for free.
 - *Plain markdown:* `specs/NNN-slug.md` frontmatter `status`, `depends_on`.
 - *OpenSpec:* `openspec/changes/<id>/` (proposal.md, tasks.md); moved to archive → done.

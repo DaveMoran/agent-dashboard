@@ -22,23 +22,23 @@ afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 const put = (dir: string, content: string) => fs.writeFileSync(path.join(dir, NAME), content);
 
 test("no file returns undefined port and source", async () => {
-  expect(await loadConfig(repo, cwd)).toEqual({ port: undefined, source: undefined });
+  expect(await loadConfig(repo, cwd)).toEqual({ port: undefined, adapter: undefined, source: undefined });
 });
 
 test("file in repo only", async () => {
   put(repo, '{"port": 4400}');
-  expect(await loadConfig(repo, cwd)).toEqual({ port: 4400, source: path.join(repo, NAME) });
+  expect(await loadConfig(repo, cwd)).toEqual({ port: 4400, adapter: undefined, source: path.join(repo, NAME) });
 });
 
 test("file in cwd only", async () => {
   put(cwd, '{"port": 4401}');
-  expect(await loadConfig(repo, cwd)).toEqual({ port: 4401, source: path.join(cwd, NAME) });
+  expect(await loadConfig(repo, cwd)).toEqual({ port: 4401, adapter: undefined, source: path.join(cwd, NAME) });
 });
 
 test("both present: repo wins, no merging", async () => {
   put(repo, "{}");
   put(cwd, '{"port": 4402}');
-  expect(await loadConfig(repo, cwd)).toEqual({ port: undefined, source: path.join(repo, NAME) });
+  expect(await loadConfig(repo, cwd)).toEqual({ port: undefined, adapter: undefined, source: path.join(repo, NAME) });
 });
 
 test("cwd defaults to process.cwd()", async () => {
@@ -96,10 +96,43 @@ test("port boundaries 1 and 65535 are accepted", async () => {
 
 test("unknown keys are ignored", async () => {
   put(repo, '{"port": 4404, "theme": "dark", "nested": {"a": 1}}');
-  expect(await loadConfig(repo, cwd)).toEqual({ port: 4404, source: path.join(repo, NAME) });
+  expect(await loadConfig(repo, cwd)).toEqual({ port: 4404, adapter: undefined, source: path.join(repo, NAME) });
 });
 
 test("a config path that is a directory throws ConfigValueError", async () => {
   fs.mkdirSync(path.join(repo, NAME));
   expect(await loadConfig(repo, cwd).catch((e) => e)).toBeInstanceOf(ConfigValueError);
+});
+
+test("adapter is read from the same file as port", async () => {
+  put(repo, '{"port": 4405, "adapter": "some-adapter"}');
+  expect(await loadConfig(repo, cwd)).toEqual({
+    port: 4405,
+    adapter: "some-adapter",
+    source: path.join(repo, NAME),
+  });
+});
+
+test("absent adapter is undefined", async () => {
+  put(repo, '{"port": 4406}');
+  expect((await loadConfig(repo, cwd)).adapter).toBeUndefined();
+});
+
+test.each(["5", '""', "null", "true", '["a"]'])(
+  "adapter %s throws ConfigValueError with the exact message",
+  async (value) => {
+    put(repo, `{"adapter": ${value}}`);
+    const error = (await loadConfig(repo, cwd).catch((e: unknown) => e)) as Error;
+    expect(error).toBeInstanceOf(ConfigValueError);
+    expect(error.message).toBe(
+      `Invalid config in ${path.join(repo, NAME)}: "adapter" must be a non-empty string, got ${value}`,
+    );
+  },
+);
+
+test("port validation is unchanged when adapter is present", async () => {
+  put(repo, '{"port": 0, "adapter": "x"}');
+  const error = (await loadConfig(repo, cwd).catch((e: unknown) => e)) as Error;
+  expect(error).toBeInstanceOf(ConfigValueError);
+  expect(error.message).toContain('"port" must be an integer between 1 and 65535');
 });
