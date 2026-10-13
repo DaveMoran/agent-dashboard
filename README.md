@@ -78,12 +78,13 @@ Optional `agent-visualizer.config.json`. The first file found wins (no merging):
 2. `./agent-visualizer.config.json` in the current working directory
 
 ```json
-{ "port": 4317 }
+{ "port": 4317, "adapter": "some-adapter-name" }
 ```
 
 | Key | Type | Notes |
 |---|---|---|
 | `port` | integer 1-65535 | Preferred port. |
+| `adapter` | non-empty string | Forces the named spec adapter instead of auto-detection. A value that is not a non-empty string, or a name that is not registered, exits 1 with a message (see [`docs/adapters.md`](docs/adapters.md)). |
 
 Unknown keys are ignored. The top level must be a JSON object. Precedence: `--port` flag > config file > built-in default (`4317`). Invalid JSON or values exit with code 1 and a message naming the file.
 
@@ -114,6 +115,10 @@ The state root defaults to `~/.agent-visualizer`. `<repo-key>` is the lowercase 
 - A second start for a repo with a live record exits 1 and prints the existing address.
 - Readers must not delete records they did not create.
 
+## Spec adapters
+
+Spec data reaches the app through adapters, one per spec framework, all mapping to one shared model. The core validates adapter output, reports problems as issues instead of failing, and watches the spec files for changes (read-only). No adapter ships yet. How to write and register one is in [`docs/adapters.md`](docs/adapters.md).
+
 ## Scripts
 
 | Command | What it does |
@@ -139,7 +144,10 @@ src/server/port.ts     Port fallback
 src/server/routes.ts   HTTP handler: health, static files, dev proxy
 src/server/start.ts    Bun.serve wrapper (startServer)
 src/server/errors.ts   AppError (exit 1) and UsageError (exit 2)
+src/core/              Shared spec model, adapter contract, validation, registry, scan and watcher (no framework names)
+src/adapters/          Registered spec adapters (`index.ts`)
 src/web/               React UI (Vite root)
+fixtures/              Stub adapter and fixture repos used by tests
 scripts/dev.ts         `bun run dev` launcher
 tests/                 bun tests, including spawned-CLI end-to-end tests
 specs/                 Spec Kit feature specs, plans, contracts and tasks

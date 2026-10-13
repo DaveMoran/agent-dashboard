@@ -119,7 +119,7 @@ description: "Task list for 002-common-model-adapter-interface"
 ## Phase 8: Polish, Documentation and PR
 
 - [x] T023 Create `docs/adapters.md`: what an adapter is; the shared model (fields and status vocabulary, linking `specs/002-common-model-adapter-interface/data-model.md`); the three operations and their rules (from `contracts/adapter.md`); how patterns and multiple roots work; what validation does with bad output (the issue catalogue); how to register an adapter in `src/adapters/index.ts`; the `adapter` config key and its errors; how to test an adapter with fixtures (point to `fixtures/stub/` as the example).
-- [ ] T024 Update `README.md`: add `adapter` to the config file table (type, meaning, error); add a short "Spec adapters" section linking `docs/adapters.md`; add `src/core/` and `src/adapters/` to the project structure list.
+- [x] T024 Update `README.md`: add `adapter` to the config file table (type, meaning, error); add a short "Spec adapters" section linking `docs/adapters.md`; add `src/core/` and `src/adapters/` to the project structure list.
 - [ ] T025 Update `docs/master-spec.md`: add a Decisions row "Watching | Recursive watch per root, filtered by adapter patterns; 150 ms quiet period, 2 s maximum delay; full snapshot per notification" and a sentence under the adapter contract pointing to `docs/adapters.md`.
 - [ ] T026 Walk through every section of `specs/002-common-model-adapter-interface/quickstart.md` for real; fix the code or report any mismatch with the quickstart (do not edit the quickstart's expected outcomes without saying why).
 - [ ] T027 Run `bun run verify` three times in a row and `bun run build`; all must pass. Fix failures before continuing.
