@@ -156,4 +156,4 @@ description: "Task list for 002-common-model-adapter-interface"
 - [x] R3 `src/core/watcher.ts`: start the OS watchers before the initial scan; if a relevant event arrives during the initial scan, run one follow-up scan after the initial notification. Test with `parseDelayMs`.
 - [x] R4 `tests/watcher.test.ts`: calling `stop()` while a slow scan is in flight emits no notification after `stop()` resolves.
 - [x] R5 `src/core/watcher.ts`: deduplicate watch-error issues so the same message is never repeated in a snapshot.
-- [ ] R6 `README.md`: update the opening status paragraph to describe the current state.
+- [x] R6 `README.md`: update the opening status paragraph to describe the current state.

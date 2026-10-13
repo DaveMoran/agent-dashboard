@@ -2,7 +2,7 @@
 
 Agent Visualizer is a small local web UI that observes the planner/coder agent pair working in one repository. Point it at a repo and it serves a page in your browser. It is **read-only**: it never writes into the repo it observes.
 
-This is the server skeleton (spec `001-server-skeleton`). The server, CLI, health endpoint, discovery record and a placeholder page showing the repo name are in place. The spec board, timeline and adapters come in later specs (see [`docs/master-spec.md`](docs/master-spec.md)).
+This is the server skeleton (spec `001-server-skeleton`) plus the shared spec model, adapter contract and spec watcher (spec `002-common-model-adapter-interface`). The server, CLI, health endpoint, discovery record and a placeholder page showing the repo name are in place, and the core can validate adapter output, select an adapter, scan and watch spec files. There is no framework adapter yet, so no specs are read from a real repo. The first adapter, the spec board and the timeline come in later specs (see [`docs/master-spec.md`](docs/master-spec.md)).
 
 ## Prerequisites
 
