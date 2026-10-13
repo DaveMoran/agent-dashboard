@@ -83,12 +83,17 @@ export async function scan(
     return { ok: false, error: { stage: "parse", message: messageOf(err) } };
   }
 
+  // The same unreadable path can be reached through several targets; report it once.
+  const uniqueIssues = issues.filter(
+    (issue, i) => issues.findIndex((o) => o.message === issue.message) === i,
+  );
+
   const validated = validateSpecs(raw);
   return {
     ok: true,
     snapshot: {
       specs: validated.specs,
-      issues: [...issues, ...validated.issues],
+      issues: [...uniqueIssues, ...validated.issues],
       adapter: adapter.name,
       scannedAt: new Date().toISOString(),
     },

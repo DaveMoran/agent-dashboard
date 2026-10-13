@@ -60,6 +60,15 @@ describe("scan", () => {
     expect(snap.specs.find((s) => s.id === "001")!.source).toEqual({ root: repoA });
   });
 
+  test("the same unreadable root listed twice is reported once", async () => {
+    const missing = path.join(FIXTURES, "stub", "does-not-exist");
+    const snap = await okSnapshot(
+      await scan(createStubAdapter(), { roots: [missing, missing] }),
+    );
+    expect(snap.issues).toHaveLength(1);
+    expect(snap.issues[0]!.kind).toBe("unreadable-path");
+  });
+
   test("null adapter gives an empty snapshot", async () => {
     const snap = await okSnapshot(await scan(null, { roots: [repoA] }));
     expect(snap.specs).toEqual([]);

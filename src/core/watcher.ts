@@ -79,7 +79,10 @@ export async function watchSpecs(options: WatchOptions): Promise<SpecWatcher> {
     const result = await scan(tracked, ctx);
     if (result.ok) {
       const snapshot = result.snapshot;
-      if (watchIssues.length > 0) snapshot.issues = [...snapshot.issues, ...watchIssues];
+      // Never repeat the same message in one snapshot.
+      const seen = new Set(snapshot.issues.map((i) => i.message));
+      const extra = watchIssues.filter((i) => !seen.has(i.message));
+      if (extra.length > 0) snapshot.issues = [...snapshot.issues, ...extra];
       current = snapshot;
       hasGood = true;
       emit({ type: kind, snapshot });
@@ -145,11 +148,14 @@ export async function watchSpecs(options: WatchOptions): Promise<SpecWatcher> {
     return isDirectory(path.join(root, filename));
   }
 
+  function addWatchIssue(root: string, err: unknown): void {
+    const message = `Cannot watch ${root}: ${err instanceof Error ? err.message : String(err)}`;
+    if (watchIssues.some((i) => i.message === message)) return;
+    watchIssues.push({ kind: "unreadable-path", message });
+  }
+
   function recordWatchError(root: string, err: unknown): void {
-    watchIssues.push({
-      kind: "unreadable-path",
-      message: `Cannot watch ${root}: ${err instanceof Error ? err.message : String(err)}`,
-    });
+    addWatchIssue(root, err);
     onChange();
   }
 
@@ -163,10 +169,7 @@ export async function watchSpecs(options: WatchOptions): Promise<SpecWatcher> {
         w.on("error", (err) => recordWatchError(root, err));
         watchers.push(w);
       } catch (err) {
-        watchIssues.push({
-          kind: "unreadable-path",
-          message: `Cannot watch ${root}: ${err instanceof Error ? err.message : String(err)}`,
-        });
+        addWatchIssue(root, err);
       }
     }
   }

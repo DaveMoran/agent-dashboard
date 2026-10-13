@@ -230,6 +230,17 @@ describe("watchSpecs", () => {
     expect(await s.quiet(1200)).toEqual([]);
   });
 
+  test("watch-error issues are never repeated in a snapshot", async () => {
+    const root = await copyFixture("stub/repo-a");
+    const missing = path.join(root, "does-not-exist");
+    const s = await start([root, missing, missing]);
+    const first = await s.next();
+    expect(first.type).toBe("initial");
+    const messages = s.watcher.current().issues.map((i) => i.message);
+    expect(messages.filter((m) => m.startsWith(`Cannot watch ${missing}`))).toHaveLength(1);
+    expect(new Set(messages).size).toBe(messages.length);
+  });
+
   test("a failing first scan emits error with an empty snapshot", async () => {
     const root = await copyFixture("stub/repo-a");
     await writeFile(spec(root, "001.json"), "FAIL");
