@@ -5,6 +5,7 @@ import { AppError } from "./errors.js";
 
 export type Config = {
   port: number | undefined;
+  adapter: string | undefined;
   source: string | undefined;
 };
 
@@ -40,7 +41,7 @@ export async function loadConfig(repoPath: string, cwd: string = process.cwd()):
       throw new ConfigValueError(`Invalid config in ${file}: top level must be a JSON object`);
     }
 
-    const { port } = parsed as { port?: unknown };
+    const { port, adapter } = parsed as { port?: unknown; adapter?: unknown };
     if (port !== undefined) {
       if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) {
         throw new ConfigValueError(
@@ -48,7 +49,14 @@ export async function loadConfig(repoPath: string, cwd: string = process.cwd()):
         );
       }
     }
-    return { port: port as number | undefined, source: file };
+    if (adapter !== undefined) {
+      if (typeof adapter !== "string" || adapter === "") {
+        throw new ConfigValueError(
+          `Invalid config in ${file}: "adapter" must be a non-empty string, got ${JSON.stringify(adapter)}`,
+        );
+      }
+    }
+    return { port: port as number | undefined, adapter: adapter as string | undefined, source: file };
   }
-  return { port: undefined, source: undefined };
+  return { port: undefined, adapter: undefined, source: undefined };
 }
