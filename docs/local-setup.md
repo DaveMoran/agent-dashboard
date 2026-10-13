@@ -42,6 +42,8 @@ Claude Code's startup prompt is about 31-35k tokens. With Ollama's default 32k w
 | Rule | Enforced by |
 |---|---|
 | No commits on `main` | `.githooks/pre-commit` |
+| No pushes to `main` (any local ref to `main` or `master`) | `.githooks/pre-push` |
+| No direct updates to `main` on GitHub; changes need a pull request, including from the maintainer | GitHub branch protection on `main` |
 | Commit subject ends with `[spec-NNN]` on spec branches | `.githooks/commit-msg` |
 | Coder cannot stop with uncommitted work | `.claude/hooks/require-commit.sh` (Stop hook, `AV_ROLE=coder` only) |
 | No `brew`, `sudo`, global installs, `--no-verify`, force pushes, pushes to `main`, or summary files | Deny rules in `.claude/settings.json` |
