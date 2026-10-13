@@ -152,5 +152,5 @@ Work is done by two agent sessions: a **planner** (Claude, plan mode) that write
 
 - One feature branch (`NNN-feature-name`) and one pull request per spec. Never commit to `main`.
 - Commit one logical unit at a time; every commit subject ends with `[spec-NNN]`.
-- Enable the repo's git hooks once per clone: `git config core.hooksPath .githooks` (refuses commits on `main` and requires the `[spec-NNN]` tag).
+- Enable the repo's git hooks once per clone: `git config core.hooksPath .githooks` (refuses commits and pushes on `main` and requires the `[spec-NNN]` tag). `main` is also protected on GitHub, so every change goes through a pull request..
 - Run `bun run verify` before calling a task done.
