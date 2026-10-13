@@ -123,7 +123,7 @@ description: "Task list for 002-common-model-adapter-interface"
 - [x] T025 Update `docs/master-spec.md`: add a Decisions row "Watching | Recursive watch per root, filtered by adapter patterns; 150 ms quiet period, 2 s maximum delay; full snapshot per notification" and a sentence under the adapter contract pointing to `docs/adapters.md`.
 - [x] T026 Walk through every section of `specs/002-common-model-adapter-interface/quickstart.md` for real; fix the code or report any mismatch with the quickstart (do not edit the quickstart's expected outcomes without saying why).
 - [x] T027 Run `bun run verify` three times in a row and `bun run build`; all must pass. Fix failures before continuing.
-- [ ] T028 Confirm `git status` is clean (no temp files, no `node_modules`, no `dist`), every task above is ticked, and all work is committed with `[spec-002]`.
+- [x] T028 Confirm `git status` is clean (no temp files, no `node_modules`, no `dist`), every task above is ticked, and all work is committed with `[spec-002]`.
 - [ ] T029 Push `002-common-model-adapter-interface` and open a pull request to `main` with `gh pr create`. Description: summary of the spec, link to `specs/002-common-model-adapter-interface/`, documentation updated (T023-T025), results of T026-T027, and anything not verified. End the description with the line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`. Do not merge it; the maintainer reviews and merges.
 
 ---
