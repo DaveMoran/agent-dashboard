@@ -142,7 +142,7 @@ description: "Task list for 001-server-skeleton"
 - [x] T040 Walk through every scenario in `specs/001-server-skeleton/quickstart.md`; fix any code or any doc/command in the quickstart that does not match actual behavior.
 - [x] T041 Run `bun run verify` (type check + tests) and `bun run build`; both must pass with no errors. Fix failures before continuing.
 - [x] T042 Confirm `git status` shows no stray files (no `node_modules`, `dist`, temp files), check off every task above, and commit remaining work with a message ending in `[spec-001]`.
-- [ ] T043 Push `001-server-skeleton` and open a pull request to `main` with `gh pr create`. PR description: summary of the spec, link to `specs/001-server-skeleton/`, list of documentation updated (T038, T039), and results of T037/T040. If no git remote is configured, STOP and tell the human instead of creating one.
+- [x] T043 Push `001-server-skeleton` and open a pull request to `main` with `gh pr create`. PR description: summary of the spec, link to `specs/001-server-skeleton/`, list of documentation updated (T038, T039), and results of T037/T040. If no git remote is configured, STOP and tell the human instead of creating one. **Outcome (2026-10-12):** the branch was pushed to `main` directly by the maintainer, so no PR was opened for 001. PR-only `main` was introduced afterwards (pre-push hook, branch protection, constitution 1.2.1, PR #1).
 
 ---
 
