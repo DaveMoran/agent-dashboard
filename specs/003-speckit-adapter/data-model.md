@@ -74,7 +74,7 @@ Specs are returned sorted by `id`, then `dirName`. Two directories with the same
 | Directory | Files | Expected status | Purpose |
 |---|---|---|---|
 | `.specify/memory/constitution.md` | one line | n/a | Detection without features |
-| `specs/001-drafted/` | `spec.md` | `drafted` | Title `Drafted Feature` |
+| `specs/001-drafted/` | `spec.md` | `drafted` | Title `Drafted` |
 | `specs/002-planned/` | `spec.md`, `plan.md` | `planned` | |
 | `specs/003-ready/` | `spec.md`, `plan.md`, `tasks.md` (3 unticked) | `ready` | |
 | `specs/004-in-progress/` | `spec.md`, `plan.md`, `tasks.md` (2 of 5 ticked, two phases, one `[P]`), `contracts/api.md`, `checklists/requirements.md` | `in-progress` | Artifacts in subfolders, phases |
