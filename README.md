@@ -2,7 +2,7 @@
 
 Agent Visualizer is a small local web UI that observes the planner/coder agent pair working in one repository. Point it at a repo and it serves a page in your browser. It is **read-only**: it never writes into the repo it observes.
 
-This is the server skeleton (spec `001-server-skeleton`) plus the shared spec model, adapter contract and spec watcher (spec `002-common-model-adapter-interface`). The server, CLI, health endpoint, discovery record and a placeholder page showing the repo name are in place, and the core can validate adapter output, select an adapter, scan and watch spec files. There is no framework adapter yet, so no specs are read from a real repo. The first adapter, the spec board and the timeline come in later specs (see [`docs/master-spec.md`](docs/master-spec.md)).
+This is the server skeleton (spec `001-server-skeleton`) plus the shared spec model, adapter contract and spec watcher (spec `002-common-model-adapter-interface`). The server, CLI, health endpoint, discovery record and a placeholder page showing the repo name are in place, and the core can validate adapter output, select an adapter, scan and watch spec files. The Spec Kit adapter (spec `003-speckit-adapter`) now reads specs from every worktree of a repo; the spec board and the timeline come in later specs (see [`docs/master-spec.md`](docs/master-spec.md)).
 
 ## Prerequisites
 
@@ -117,7 +117,7 @@ The state root defaults to `~/.agent-visualizer`. `<repo-key>` is the lowercase 
 
 ## Spec adapters
 
-Spec data reaches the app through adapters, one per spec framework, all mapping to one shared model. The core validates adapter output, reports problems as issues instead of failing, and watches the spec files for changes (read-only). No adapter ships yet. How to write and register one is in [`docs/adapters.md`](docs/adapters.md).
+Spec data reaches the app through adapters, one per spec framework, all mapping to one shared model. The core validates adapter output, reports problems as issues instead of failing, and watches the spec files for changes (read-only). The `speckit` adapter reads Spec Kit features from `specs/NNN-name/`. How to write and register one is in [`docs/adapters.md`](docs/adapters.md).
 
 ## Scripts
 
@@ -126,6 +126,7 @@ Spec data reaches the app through adapters, one per spec framework, all mapping 
 | `bun run dev -- <repo-path> [--port <n>]` | Starts Vite (port 5173) and the Bun server together. The Bun server proxies HTTP requests to Vite, so open the address the server prints. Hot reload works: Vite's HMR WebSocket connects directly to port 5173. Ctrl+C stops both. |
 | `bun run build` | Builds the UI to `dist/web`. |
 | `bun test` | Runs the unit, integration and end-to-end tests (they use temp directories and a temp state dir, never your real `~/.agent-visualizer`). |
+| `bun run live-check [repo-path]` | Scans a repo (default: this one) with the Spec Kit adapter and prints its roots, specs and issues. Read-only; not part of `bun test`. |
 | `bun run verify` | Type check (`tsc --noEmit`) and `bun test`. Run this before calling work done. |
 
 ## Read-only guarantee
@@ -145,9 +146,11 @@ src/server/routes.ts   HTTP handler: health, static files, dev proxy
 src/server/start.ts    Bun.serve wrapper (startServer)
 src/server/errors.ts   AppError (exit 1) and UsageError (exit 2)
 src/core/              Shared spec model, adapter contract, validation, registry, scan and watcher (no framework names)
+src/git/               Read-only git access (runGit, worktree roots)
 src/adapters/          Registered spec adapters (`index.ts`)
+src/adapters/speckit/  The Spec Kit adapter
 src/web/               React UI (Vite root)
-fixtures/              Stub adapter and fixture repos used by tests
+fixtures/              Stub adapter, `fixtures/speckit/` and other fixture repos used by tests
 scripts/dev.ts         `bun run dev` launcher
 tests/                 bun tests, including spawned-CLI end-to-end tests
 specs/                 Spec Kit feature specs, plans, contracts and tasks
