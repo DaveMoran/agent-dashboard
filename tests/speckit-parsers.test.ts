@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
-import { groupFeatureFiles, parseFeatureDirName } from "../src/adapters/speckit/feature-dir";
+import { pickAuthoritative } from "../src/adapters/speckit/authority";
+import { groupFeatureFiles, parseFeatureDirName, type FeatureCopy } from "../src/adapters/speckit/feature-dir";
 import { deriveStatus } from "../src/adapters/speckit/status";
 import { parseTasks } from "../src/adapters/speckit/tasks";
 import { parseTitle } from "../src/adapters/speckit/title";
@@ -117,5 +118,36 @@ describe("deriveStatus", () => {
     expect(deriveStatus({ ...base, merged: true })).toBe("done");
     expect(deriveStatus({ ...base, hasTasks: true })).toBe("ready");
     expect(deriveStatus({ ...base, hasTasks: true, hasPlan: true, tasks: [t(true)] })).toBe("review");
+  });
+});
+
+describe("pickAuthoritative", () => {
+  const roots = ["/A", "/B", "/C"];
+  const copy = (root: string): FeatureCopy => ({
+    root,
+    dirName: "003-x",
+    id: "003",
+    files: ["specs/003-x/spec.md"],
+  });
+  const pick = (copyRoots: string[], branches: Record<string, string | null>): string =>
+    pickAuthoritative(copyRoots.map(copy), new Map(Object.entries(branches)), roots).root;
+
+  test("a single copy wins", () => {
+    expect(pick(["/A"], { "/A": "main" })).toBe("/A");
+    expect(pick(["/B"], { "/B": "main" })).toBe("/B");
+  });
+
+  test("the root with the feature branch checked out wins", () => {
+    expect(pick(["/A", "/B"], { "/A": "main", "/B": "003-x" })).toBe("/B");
+    expect(pick(["/A", "/B"], { "/A": "003-x", "/B": "main" })).toBe("/A");
+  });
+
+  test("without a matching branch the first root wins", () => {
+    expect(pick(["/A", "/B"], { "/A": "main", "/B": null })).toBe("/A");
+    expect(pick(["/B", "/C"], { "/A": "main", "/B": "main", "/C": "main" })).toBe("/B");
+  });
+
+  test("copies given out of order still resolve by root order", () => {
+    expect(pick(["/C", "/B"], { "/B": "main", "/C": "main" })).toBe("/B");
   });
 });
