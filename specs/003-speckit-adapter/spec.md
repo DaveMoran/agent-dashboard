@@ -76,11 +76,12 @@ Once a feature's pull request is merged into `main`, the developer wants it in t
 
 **Acceptance Scenarios**:
 
-1. **Given** a feature branch whose latest commit is contained in `main`, **When** the repo is scanned, **Then** the spec's status is `done`.
+1. **Given** a feature branch merged into `main` with a merge commit, so `main` contains the feature directory with a task list in which every task is ticked, **When** the repo is scanned, **Then** the spec's status is `done`.
 2. **Given** a feature that was squash-merged, so `main` contains the feature directory with a task list in which every task is ticked, **When** the repo is scanned, **Then** the status is `done`, even if the feature branch has been deleted.
 3. **Given** `main` contains a feature directory whose task list still has unticked tasks (for example a spec-only PR that was merged early), **When** the repo is scanned, **Then** the status is not `done`; it is derived from the files as usual.
 4. **Given** a feature with every task ticked on its branch, not merged, **When** the repo is scanned, **Then** the status is `review`.
-5. **Given** a repo with no `main` branch, or a folder that is not a git repo at all, **When** it is scanned, **Then** no spec is `done` and every other status is derived from the files as usual, without an error.
+5. **Given** a feature branch just created from `main`, with a new feature directory that has no commits of its own yet, **When** the repo is scanned, **Then** the status is derived from the files (for example `drafted`), not `done`.
+6. **Given** a repo with no `main` branch, or a folder that is not a git repo at all, **When** it is scanned, **Then** no spec is `done` and every other status is derived from the files as usual, without an error.
 
 ---
 
@@ -144,7 +145,7 @@ The developer runs a live check against this repository's own `specs/` folder an
 **Status**
 
 - **FR-016**: Status MUST be derived as follows, the first matching rule winning: merged into `main` → `done`; `tasks.md` present with at least one task, all done → `review`; `tasks.md` present with some but not all tasks done → `in-progress`; `tasks.md` present → `ready`; `plan.md` present → `planned`; otherwise → `drafted`.
-- **FR-017**: A feature MUST count as merged into `main` when its feature branch's latest commit is contained in `main`, or when `main` itself contains the feature's `tasks.md` with at least one task and every task done. This covers merge commits, squash merges and deleted branches.
+- **FR-017**: A feature MUST count as merged into `main` exactly when `main` itself contains the feature's `tasks.md` with at least one task and every task done. This covers merge commits, squash merges and deleted branches, and does not depend on branch ancestry (a branch freshly created from `main` is already "contained in" `main` but is not merged).
 - **FR-018**: When there is no `main` branch, or the repo is not a git repo, no spec MUST be `done`, and this MUST NOT be an error.
 
 **Worktrees**
@@ -193,7 +194,7 @@ The developer runs a live check against this repository's own `specs/` folder an
 - The common model, adapter contract, validation, registry and watcher from feature 002 are used unchanged; this feature adds the first concrete adapter and the list of roots it runs on.
 - Feature 005 (git ingester) is not built yet. This feature lists worktrees and their branches in the way 005 describes (git's porcelain worktree listing), only as far as the adapter needs; 005 will take over or reuse it.
 - The main line is the local branch named `main`. Other names (such as `master` or a configured default) are out of scope for now.
-- Squash merges are recognized by the merged task list on `main`, because this project squash-merges pull requests and its feature branches are often not ancestors of `main`.
+- A feature is recognized as merged by its fully ticked task list on `main`, not by branch ancestry: this project squash-merges pull requests, so feature branches are often not ancestors of `main`, and a branch freshly created from `main` is an ancestor without being merged.
 - The spec id is the feature number (`003`), matching the `[spec-NNN]` commit tags, rather than the full directory name, which is kept as the branch.
 - Dependencies between Spec Kit features are not read; the dependency graph (feature 008) will show Spec Kit specs unconnected until a later feature defines a way to declare them.
 - The `blocked` status is never produced by this adapter; Spec Kit has no explicit blocked marker.
