@@ -185,7 +185,7 @@ description: "Task list for 003-speckit-adapter"
 - [X] T030 Walk through every section of `specs/003-speckit-adapter/quickstart.md` for real (section 3 is optional; if you run it, remove the demo worktree and branch afterwards). Fix the code or report any mismatch (do not edit the quickstart).
 - [X] T031 Run `bun run verify` three times in a row and `bun run build`; all must pass. Fix failures before continuing.
 - [X] T032 Confirm `git status` is clean (no temp files, no `node_modules`, no `dist`), every task above is ticked, and all work is committed with `[spec-003]`.
-- [ ] T033 Push `003-speckit-adapter` and open a pull request to `main` with `gh pr create`. Description: summary of the spec, link to `specs/003-speckit-adapter/`, documentation updated (T027-T029), the live-check output from T026, results of T030-T031, and anything not verified. End the description with the line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`. Do not merge it; the maintainer reviews and merges.
+- [X] T033 Push `003-speckit-adapter` and open a pull request to `main` with `gh pr create`. Description: summary of the spec, link to `specs/003-speckit-adapter/`, documentation updated (T027-T029), the live-check output from T026, results of T030-T031, and anything not verified. End the description with the line `🤖 Generated with [Claude Code](https://claude.com/claude-code)`. Do not merge it; the maintainer reviews and merges.
 
 ---
 
