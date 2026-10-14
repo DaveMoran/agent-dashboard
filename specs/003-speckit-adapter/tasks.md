@@ -44,7 +44,7 @@ description: "Task list for 003-speckit-adapter"
   - `snapshotTree(dirs: string[]): Promise<string[]>`: for each dir, every file below it (recursively, skipping any entry named `.git`), one string `<dir>|<relative path>|<sha1 hex of contents>` (use `new Bun.CryptoHasher("sha1")`); return all strings sorted.
   - `gitState(repo: string): Promise<string>`: `git for-each-ref` output followed by `git worktree list --porcelain` output.
 - [X] T004 Create `tests/git-run.test.ts`: in a `makeGitRepo()` repo, `runGit(repo, ["rev-parse", "--is-inside-work-tree"])` gives `{ code: 0, stdout: "true\n" }` (check both fields); in a plain `mkdtemp` dir (not git), the same call gives a non-zero `code` and a non-empty `stderr`; with a `cwd` that does not exist it resolves (does not reject) with a non-zero `code`. Use `afterEach(cleanupFixtures)`.
-- [ ] T005 [P] Create the fixture repo `fixtures/speckit/repo/` with exactly these files (each `spec.md` title line followed by a blank line and one line of text; each `plan.md` is `# Implementation Plan\n`):
+- [X] T005 [P] Create the fixture repo `fixtures/speckit/repo/` with exactly these files (each `spec.md` title line followed by a blank line and one line of text; each `plan.md` is `# Implementation Plan\n`):
   - `.specify/memory/constitution.md`: `# Constitution\n`
   - `specs/README.md`: `Not a feature.\n`
   - `specs/notes/README.md`: `Not a feature either.\n`
@@ -71,7 +71,7 @@ description: "Task list for 003-speckit-adapter"
   - `specs/007-no-plan/spec.md` (`# No Plan Here`), `tasks.md` with `- [x] T001 Done` and `- [ ] T002 Not done`
   - `specs/008-untitled/spec.md`: `## No top heading\n\nText.\n`
   - `specs/009-no-spec/plan.md`
-- [ ] T006 [P] Create `fixtures/speckit/tasks-tricky.md` with exactly the content shown in `contracts/speckit-adapter.md` under "`fixtures/speckit/tasks-tricky.md` (exact file)" (the text between the outer four-backtick fence, not including it).
+- [X] T006 [P] Create `fixtures/speckit/tasks-tricky.md` with exactly the content shown in `contracts/speckit-adapter.md` under "`fixtures/speckit/tasks-tricky.md` (exact file)" (the text between the outer four-backtick fence, not including it).
 
 **Checkpoint**: `bun run verify` passes.
 
