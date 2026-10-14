@@ -27,7 +27,7 @@ description: "Task list for 003-speckit-adapter"
 
 ## Phase 1: Setup
 
-- [ ] T001 Run `git branch --show-current` (expect `003-speckit-adapter`) and `bun run verify` (expect all 175 existing tests to pass) to confirm a green baseline before any change.
+- [X] T001 Run `git branch --show-current` (expect `003-speckit-adapter`) and `bun run verify` (expect all 175 existing tests to pass) to confirm a green baseline before any change.
 
 ---
 
@@ -35,7 +35,7 @@ description: "Task list for 003-speckit-adapter"
 
 **Purpose**: Read-only git runner, git test helpers and fixtures.
 
-- [ ] T002 [P] Create `src/git/run.ts` exactly as in `contracts/git.md` ("run.ts"): export `interface GitResult { code: number; stdout: string; stderr: string }` and `async function runGit(cwd: string, args: string[]): Promise<GitResult>`. Use `Bun.spawn(["git", "-C", cwd, ...args], { env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }, stdin: "ignore", stdout: "pipe", stderr: "pipe" })`, read both streams with `new Response(proc.stdout).text()`, await `proc.exited`. Wrap everything in `try/catch`; on any thrown error resolve `{ code: -1, stdout: "", stderr: <error message> }`. It must never reject.
+- [X] T002 [P] Create `src/git/run.ts` exactly as in `contracts/git.md` ("run.ts"): export `interface GitResult { code: number; stdout: string; stderr: string }` and `async function runGit(cwd: string, args: string[]): Promise<GitResult>`. Use `Bun.spawn(["git", "-C", cwd, ...args], { env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }, stdin: "ignore", stdout: "pipe", stderr: "pipe" })`, read both streams with `new Response(proc.stdout).text()`, await `proc.exited`. Wrap everything in `try/catch`; on any thrown error resolve `{ code: -1, stdout: "", stderr: <error message> }`. It must never reject.
 - [ ] T003 [P] Add `export function trackTempDir(dir: string): void` to `tests/helpers.ts` that pushes `dir` onto the existing `created` array (so `cleanupFixtures()` removes it). Then create `tests/git-helpers.ts` exporting:
   - `git(cwd: string, ...args: string[]): Promise<string>`: runs `git -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false -c core.hooksPath=/dev/null <args>` with `cwd` as the working directory via `Bun.spawn`; returns stdout; throws `new Error(\`git ${args.join(" ")} failed: <stderr>\`)` on a non-zero exit (test-only helper, so throwing is fine).
   - `makeGitRepo(fixture?: string, options?: { branch?: string }): Promise<string>`: if `fixture` is given use `copyFixture(fixture)`, otherwise an empty `mkdtemp` dir passed through `realpath` and `trackTempDir`; run `git init -q -b <options.branch ?? "main">`; if a fixture was copied, `commitAll(dir, "fixture")`. Returns the real path.
