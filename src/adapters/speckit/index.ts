@@ -2,6 +2,8 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import type { Adapter, RepoContext, WatchTarget } from "../../core/adapter";
 import type { Spec } from "../../core/model";
+import { currentBranch } from "../../git/worktrees";
+import { pickAuthoritative } from "./authority";
 import { groupFeatureFiles, parseFeatureDirName, type FeatureCopy } from "./feature-dir";
 import { deriveStatus } from "./status";
 import { parseTasks } from "./tasks";
@@ -60,13 +62,19 @@ export const speckitAdapter: Adapter = {
   },
 
   async parse(ctx: RepoContext, files: string[]): Promise<RawSpec[]> {
-    const chosen = new Map<string, FeatureCopy>();
+    const rootBranches = new Map<string, string | null>();
+    for (const root of ctx.roots) rootBranches.set(root, await currentBranch(root));
+
+    const byDir = new Map<string, FeatureCopy[]>();
     for (const copy of groupFeatureFiles(ctx.roots, files)) {
-      if (!chosen.has(copy.dirName)) chosen.set(copy.dirName, copy);
+      byDir.set(copy.dirName, [...(byDir.get(copy.dirName) ?? []), copy]);
     }
+    const chosen = [...byDir.values()].map((copies) =>
+      pickAuthoritative(copies, rootBranches, ctx.roots),
+    );
 
     const specs: Array<{ dirName: string; spec: RawSpec }> = [];
-    for (const copy of chosen.values()) {
+    for (const copy of chosen) {
       const dir = `specs/${copy.dirName}`;
       const specMd = await Bun.file(path.join(copy.root, dir, "spec.md")).text();
       const hasTasks = copy.files.includes(`${dir}/tasks.md`);
@@ -74,6 +82,7 @@ export const speckitAdapter: Adapter = {
         ? parseTasks(await Bun.file(path.join(copy.root, dir, "tasks.md")).text())
         : [];
       const title = parseTitle(specMd);
+      const branch = rootBranches.get(copy.root) ?? null;
       const spec: RawSpec = {
         id: copy.id,
         ...(title === null ? {} : { title }),
@@ -87,7 +96,7 @@ export const speckitAdapter: Adapter = {
         tasks,
         artifacts: copy.files,
         branch: copy.dirName,
-        source: { root: copy.root },
+        source: branch === null ? { root: copy.root } : { root: copy.root, branch },
       };
       specs.push({ dirName: copy.dirName, spec });
     }
