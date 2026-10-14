@@ -172,7 +172,7 @@ description: "Task list for 003-speckit-adapter"
 
 **Independent Test**: `bun run live-check` output matches `quickstart.md` section 2.
 
-- [ ] T025 [US5] Create `scripts/live-check.ts` per `contracts/live-check.md`: optional first argument (default `path.resolve(import.meta.dir, "..")`), `resolveRoots`, `currentBranch` per root, `scan(speckitAdapter, { roots })`. On success print one `root  <path>  (<branch or "detached">)` line per root, one `<id>  <status padded to 11>  <title>  [<source.root>[, <source.branch>]]` line per spec and one `issue  <kind>  <message>` line per issue, then exit 0. On `ok: false` print `Scan failed (<stage>): <message>` to stderr and exit 1. Add `"live-check": "bun scripts/live-check.ts"` to `scripts` in `package.json`.
+- [X] T025 [US5] Create `scripts/live-check.ts` per `contracts/live-check.md`: optional first argument (default `path.resolve(import.meta.dir, "..")`), `resolveRoots`, `currentBranch` per root, `scan(speckitAdapter, { roots })`. On success print one `root  <path>  (<branch or "detached">)` line per root, one `<id>  <status padded to 11>  <title>  [<source.root>[, <source.branch>]]` line per spec and one `issue  <kind>  <message>` line per issue, then exit 0. On `ok: false` print `Scan failed (<stage>): <message>` to stderr and exit 1. Add `"live-check": "bun scripts/live-check.ts"` to `scripts` in `package.json`.
 - [ ] T026 [US5] Run `git status --short` (expect empty), `bun run live-check`, then `git status --short` again (expect empty). Confirm `001  done` "Server Skeleton" and `002  done` "Common Spec Model and Adapter Contract" appear, plus `003` with its current status. Paste the output in your reply (do not save it to a file). If 001 or 002 is not `done`, stop and report.
 
 ---
