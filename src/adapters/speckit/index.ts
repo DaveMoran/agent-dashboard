@@ -5,6 +5,7 @@ import type { Spec } from "../../core/model";
 import { currentBranch } from "../../git/worktrees";
 import { pickAuthoritative } from "./authority";
 import { groupFeatureFiles, parseFeatureDirName, type FeatureCopy } from "./feature-dir";
+import { isMergedIntoMain } from "./merged";
 import { deriveStatus } from "./status";
 import { parseTasks } from "./tasks";
 import { parseTitle } from "./title";
@@ -90,7 +91,7 @@ export const speckitAdapter: Adapter = {
           hasPlan: copy.files.includes(`${dir}/plan.md`),
           hasTasks,
           tasks,
-          merged: false,
+          merged: await isMergedIntoMain(copy.root, copy.dirName),
         }),
         dependsOn: [],
         tasks,
