@@ -29,7 +29,7 @@ description: "Task list for 004-session-ingester"
 
 ## Phase 1: Setup
 
-- [ ] T001 Run `git branch --show-current` (expect `004-session-ingester`) and `bun run verify` (expect all 242 existing tests to pass) to confirm a green baseline before any change. No commit needed if nothing changed.
+- [X] T001 Run `git branch --show-current` (expect `004-session-ingester`) and `bun run verify` (expect all 242 existing tests to pass) to confirm a green baseline before any change. No commit needed if nothing changed.
 
 ---
 
