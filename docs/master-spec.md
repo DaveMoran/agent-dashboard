@@ -18,8 +18,8 @@ The tool is **dogfooded**: built with Spec Kit, so its own repo is the first liv
 | Brains | MELCHIOR (1), BALTHASAR (2), CASPER (3). A project takes the lowest free brain when its first main-agent session becomes active and keeps it while active; it is freed after all its main sessions end or idle past a timeout (default 30 min). No reshuffling |
 | Project | The git common dir of a session's `cwd` (all worktrees of a repo are one project), or the `cwd` itself outside git |
 | Main agent | A session whose model matches a configurable regex (default `^claude-(opus|fable)`). Only main agents light up a brain; subagents and other sessions show inside their project |
-| Brain states | not active (no project): black, red lettering; standby (agent idle): green; working: slow green↔blue pulse (≥ 2 s per cycle, steady under reduced motion); waiting for the user: red. Always shown as text too. Combined over the project's main sessions: waiting > working > standby. A running subagent keeps its main session working |
-| Waiting detection | Transcripts give working/standby. "Waiting" needs the opt-in attention hook, which the user installs in their own Claude Code settings and which writes only to the visualizer's state directory. Without it nothing is red |
+| Brain states | not active (no project): black, red lettering; standby (agent idle): green; working: slow green↔blue pulse (≥ 2 s per cycle, steady under reduced motion); waiting for the user: red. Always shown as text too. Combined over the project's main sessions: waiting > working > standby. A running subagent, background ones included, keeps its main session working |
+| Waiting detection | Transcripts give working/standby: a turn ends at an `end_turn` reply, a `turn_duration` line or an interrupt line. "Waiting" needs the opt-in attention hook, which the user installs in their own Claude Code settings and which writes only to the visualizer's state directory. Without it nothing is red |
 | Agent sources | Session state comes through an "agent source" interface: transcripts (004), attention hook (005), later the Agent SDK |
 | Platform | Desktop only, minimum width 1024px |
 | Repo layout | One repo for now: the UI (`src/web/`) and the local MAGI server. The UI reaches the server only over HTTP/SSE and imports only the shared contract module `src/contract/` (constitution, Technology Constraints). They move to separate repos later (see Later) |
@@ -59,7 +59,7 @@ git log / branches ──► Git ingester + attribution ────────
 - *OpenSpec:* `openspec/changes/<id>/` (proposal.md, tasks.md); moved to archive → done.
 - *BMAD:* story files' `Status:` field (+ sprint status file if present); epics → grouping.
 
-**Transcript source:** tails every session JSONL under `~/.claude/projects/`, including subagent transcripts; groups sessions into projects; records prompts, tool calls (Edit/Write → file-edit, Bash → bash/test-run), model, `cwd`, `gitBranch`, timestamps.
+**Transcript source:** polls every 500 ms (no file watching) and tails every session JSONL under `~/.claude/projects/`, including subagent transcripts; a subagent counts as running until it ends its turn or the main session records its task notification, and one that dies with neither stays running until 006's idle timeout; groups sessions into projects; records prompts, tool calls (Edit/Write → file-edit, Bash → bash/test-run), model, `cwd`, `gitBranch`, timestamps.
 
 **Attribution order:** git branch on transcript entry → spec ID mentioned in prompt/commit → edited files ∈ spec's artifact/likely-files → time window between status transitions.
 
