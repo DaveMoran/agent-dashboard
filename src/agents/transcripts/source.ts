@@ -64,6 +64,8 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
 
   const recs = new Map<string, FileRec>();
   const listeners = new Set<(event: AgentSourceEvent) => void>();
+  /** Session ids already announced with session-added (a duplicate file taking over does not repeat it). */
+  const addedIds = new Set<string>();
   const issueLog: IngestIssue[] = [];
   let active = false;
   let startPromise: Promise<void> | undefined;
@@ -162,6 +164,14 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
       }
     }
     return best === rec;
+  }
+
+  function announceVisible(rec: FileRec): void {
+    rec.addedEmitted = true;
+    const session = rec.reported!;
+    if (addedIds.has(session.sessionId)) return;
+    addedIds.add(session.sessionId);
+    emit({ type: "session-added", session });
   }
 
   /** Recompute the session, remember it, and emit what changed since the last report. */
@@ -349,18 +359,14 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
         await ensureProject(rec);
         rec.reported = build(rec);
         rec.announced = true;
-        if (isVisible(rec)) {
-          rec.addedEmitted = true;
-          emit({ type: "session-added", session: rec.reported });
-        }
+        if (isVisible(rec)) announceVisible(rec);
       }
     }
 
     // A duplicate that has become the visible file is announced now.
     for (const rec of recs.values()) {
       if (rec.announced && !rec.addedEmitted && rec.reported !== undefined && isVisible(rec)) {
-        rec.addedEmitted = true;
-        emit({ type: "session-added", session: rec.reported });
+        announceVisible(rec);
       }
     }
   }
