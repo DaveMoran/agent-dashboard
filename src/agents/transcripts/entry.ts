@@ -6,6 +6,7 @@ export type EntryKind =
   | "final"
   | "turn-end"
   | "interrupt"
+  | "session-end"
   | "other";
 
 export interface TranscriptEntry {
@@ -130,6 +131,17 @@ export function classifyLine(line: string): ClassifyResult {
     if (parsed["subtype"] === "turn_duration" && timestamp !== undefined) return make("turn-end");
     return make("other");
   }
+
+  if (type === "attachment") {
+    const att = isObj(parsed["attachment"]) ? parsed["attachment"] : undefined;
+    const prompt = str(att?.["prompt"]);
+    if (att?.["type"] === "queued_command" && prompt !== undefined && prompt.startsWith("<task-notification>")) {
+      return make("other", { completedAgentIds: completedIds(prompt) });
+    }
+    return make("other");
+  }
+
+  if (type === "continued-in") return timestamp !== undefined ? make("session-end") : make("other");
 
   return make("other");
 }

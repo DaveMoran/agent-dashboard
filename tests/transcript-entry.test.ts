@@ -148,3 +148,23 @@ test("entry has exactly the TranscriptEntry keys", () => {
     ["completedAgentIds", "cwd", "kind", "model", "sessionId", "timestamp", "toolUseIds"],
   );
 });
+
+const queued = (prompt: unknown) =>
+  j({ type: "attachment", timestamp: T, sessionId: "s1", attachment: { type: "queued_command", commandMode: "task-notification", prompt } });
+test("rule 17a: queued task notification is other with completed agent ids", () => {
+  const e = entry(queued("<task-notification>\n<task-id>a1111111111111111</task-id>\n<status>completed</status>\n</task-notification>"));
+  expect(e.kind).toBe("other");
+  expect(e.completedAgentIds).toStrictEqual(["a1111111111111111"]);
+});
+test("rule 17a: ordinary queued prompt and notification without status give no ids", () => {
+  const a = entry(queued("hello"));
+  expect(a.kind).toBe("other");
+  expect(a.completedAgentIds).toStrictEqual([]);
+  const b = entry(queued("<task-notification>\n<task-id>a1111111111111111</task-id>\n</task-notification>"));
+  expect(b.kind).toBe("other");
+  expect(b.completedAgentIds).toStrictEqual([]);
+});
+test("rule 17c: continued-in with timestamp is session-end, without is other", () => {
+  expect(entry(j({ type: "continued-in", timestamp: "2026-10-15T10:09:00.000Z", sessionId: "s1", continuedInSessionId: "s2" })).kind).toBe("session-end");
+  expect(entry(j({ type: "continued-in", sessionId: "s1" })).kind).toBe("other");
+});
