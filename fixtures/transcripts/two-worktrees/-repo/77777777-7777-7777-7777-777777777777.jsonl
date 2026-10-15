@@ -1,1 +1,2 @@
-{"type":"user","timestamp":"2026-10-15T10:05:00.000Z","sessionId":"77777777-7777-7777-7777-777777777777","cwd":"{{REPO}}","message":{"role":"user","content":"Add a test"}}
+{"type":"user","timestamp":"2026-10-15T10:04:58.000Z","sessionId":"77777777-7777-7777-7777-777777777777","cwd":"{{REPO}}","message":{"role":"user","content":"Add a test"}}
+{"type":"assistant","timestamp":"2026-10-15T10:05:00.000Z","sessionId":"77777777-7777-7777-7777-777777777777","cwd":"{{REPO}}","message":{"id":"m1","model":"claude-opus-5-5","stop_reason":null,"content":[{"type":"thinking","thinking":""}]}}

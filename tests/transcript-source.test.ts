@@ -124,7 +124,7 @@ test("two-worktrees: both sessions share one projectId", async () => {
   expect(all.map((s) => s.cwd).sort()).toEqual([env.REPO, env.WORKTREE].sort());
   expect(all[0]!.projectId).toBe(path.join(env.REPO, ".git"));
   expect(all[1]!.projectId).toBe(all[0]!.projectId);
-  expect(bySession(env, id("7"))).toMatchObject({ state: "working", lastActivity: T("10:05:00") });
+  expect(bySession(env, id("7"))).toMatchObject({ state: "working", isMain: true, model: "claude-opus-5-5", lastActivity: T("10:05:00") });
 });
 
 test("non-main: sessions are not main and the project is outside git", async () => {
