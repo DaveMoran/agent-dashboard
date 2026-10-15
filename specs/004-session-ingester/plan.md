@@ -8,7 +8,7 @@
 
 Read every top-level Claude Code session transcript under `~/.claude/projects/*/`, plus each session's subagent transcripts, incrementally and read-only, and keep an in-memory picture of each session: its model, working directory, project (git common dir), whether it is a main agent, its state (`working` while its own turn is open or any of its subagents runs, else `standby`), its running-subagent count and its last activity. The picture sits behind an `AgentSource` interface (sessions, events, start/stop) so later sources (attention hook in 005, Agent SDK later) plug in without touching consumers. `GET /api/sessions` serves projects with their main sessions, shaped by types in a new `src/contract/` module.
 
-The technical approach (see [research.md](./research.md)): classify each JSONL line into a small entry kind with a pure function; fold entries into session state with a pure reducer whose rule is "the last state-bearing entry decides"; tail files by byte offset with a byte-level partial-line buffer; discover and re-read files by polling (stat-only when nothing changed) rather than recursive `fs.watch`; read only the tail window of large files on first start when that provably gives the same state; resolve projects with one cached `git rev-parse --git-common-dir` per working directory; fold each subagent transcript with the same reducer and close subagents on a final reply or the parent's task notification (background subagents are the common case, so the parent's open tool call alone is not enough).
+The technical approach (see [research.md](./research.md)): classify each JSONL line into a small entry kind with a pure function; fold entries into session state with a pure reducer whose rule is "the last state-bearing entry decides"; tail files by byte offset with a byte-level partial-line buffer; discover and re-read files by polling (stat-only when nothing changed) rather than recursive `fs.watch`; read each file in full once on first sight (fast enough; see research R5); resolve projects with one cached `git rev-parse --git-common-dir` per working directory; fold each subagent transcript with the same reducer and close subagents on a final reply or the parent's task notification (background subagents are the common case, so the parent's open tool call alone is not enough).
 
 ## Technical Context
 
@@ -49,7 +49,7 @@ The technical approach (see [research.md](./research.md)): classify each JSONL l
 
 No violations. Complexity Tracking is empty.
 
-**Post-design re-check (after Phase 1)**: still passes. The design adds one directory (`src/agents/`) and one contract file; the tail-window optimisation is a single function with an equivalence test, justified by SC-003.
+**Post-design re-check (after Phase 1)**: still passes. The design adds one directory (`src/agents/`) and one contract file.
 
 ## Project Structure
 
@@ -81,7 +81,7 @@ src/
 │   └── transcripts/
 │       ├── entry.ts                # NEW: classifyLine(line) -> TranscriptEntry | IngestIssue (pure)
 │       ├── session-state.ts        # NEW: initialSessionState(), applyEntry(state, entry) (pure reducer)
-│       ├── tail.ts                 # NEW: FileTail: byte offset, partial-line bytes, truncation reset, tail-window first read
+│       ├── tail.ts                 # NEW: FileTail: byte offset, partial-line bytes, truncation reset
 │       ├── discover.ts             # NEW: listSessionFiles(root) -> top-level <folder>/<name>.jsonl paths; listSubagentFiles(sessionFile) -> <name>/subagents/agent-*.jsonl
 │       ├── project.ts              # NEW: createProjectResolver(runGit) -> resolve(cwd): Promise<ProjectRef>, cached
 │       ├── subagents.ts            # NEW: isSubagentRunning(), combineState(turnState, runningSubagents) (pure)
@@ -101,7 +101,7 @@ fixtures/transcripts/
 tests/
 ├── transcript-entry.test.ts        # NEW: classification table tests
 ├── session-state.test.ts           # NEW: reducer tests, one per acceptance scenario of US1
-├── transcript-tail.test.ts         # NEW: offsets, partial lines (incl. split UTF-8), truncation, tail window equivalence
+├── transcript-tail.test.ts         # NEW: offsets, partial lines (incl. split UTF-8), truncation
 ├── transcript-discover.test.ts     # NEW: top-level only, subagents ignored, missing root
 ├── transcript-project.test.ts      # NEW: worktrees -> one project, subfolder, non-git, missing dir, cache
 ├── main-agent.test.ts              # NEW: default/custom/invalid pattern

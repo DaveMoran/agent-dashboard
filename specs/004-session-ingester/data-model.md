@@ -33,8 +33,6 @@ Per-file reducer state. Pure: `applyEntry(state, entry) -> SessionState` returns
 | `openToolUseIds` | `string[]` | `[]` | add on `tool-call`, remove on `tool-result`, clear on `final`/`turn-end`/`interrupt` |
 | `completedAgentIds` | `Record<string, string>` | `{}` | agent ID → timestamp of the notification entry that reported it done |
 | `ended` | `boolean` | `false` | true on `session-end`; false again on any working kind |
-| `sawModel` | `boolean` | `false` | true once an entry with `model` is applied (tail-window check) |
-| `sawStateEntry` | `boolean` | `false` | true once a state-bearing entry is applied (tail-window check) |
 
 ### State transitions
 

@@ -53,13 +53,15 @@ This rule gives the session's **own turn state**. The session's reported state a
 
 **Alternatives considered**: `fs.createReadStream` per change: more moving parts for the same result. Re-reading whole files: violates FR-003 and SC-003.
 
-## R5. First read of large files (tail window)
+## R5. First read of large files (tail window): reversed
 
-**Decision**: On first sight of a file larger than a window (default 2 MiB), read only the last window: start at `size - window`, drop bytes up to and including the first `\n` (a partial line), and fold the rest. If the folded window contains **at least one assistant entry with a real model and at least one state-bearing entry**, accept it. Otherwise discard and fold the whole file from offset 0. Either way the offset ends at `size`.
+**Original decision**: on first sight of a file over 2 MiB, fold only the last 2 MiB, falling back to a full read when that window had no model or no state-bearing entry.
 
-**Rationale**: Every value the session keeps is a "latest" value (state = last state-bearing entry, model = last real model, cwd/sessionId = last seen, last activity = max timestamp), so a suffix that contains the last state-bearing entry and the last model gives exactly the full-file result, except for open tool-call IDs opened before the window, which are only diagnostic. This keeps the first start within SC-003 on large histories. A test asserts window and full reads give equal state, model, cwd and last activity.
+**Reversed after the T021 live check**: the rationale ("every value the session keeps is a latest value") stopped holding once R12 added `completedAgentIds`, which accumulates. A 4.7 MB live session had task notifications before the window, so 4 finished subagents were reported as running. Measured cost of the alternative: folding every transcript on this machine (49 files, 58 MB) took 67 ms (about 860 MB/s), so 500 MB is on the order of a second, well inside SC-003's 10 s.
 
-**Alternatives considered**: always reading everything: 500 MB of `JSON.parse` including multi-MB blob lines risks the 10 s budget. Prefiltering lines by substring before parsing: fragile.
+**Decision now**: always fold every file from offset 0 on first sight, then tail. No window, no `tailWindowBytes` option.
+
+**Alternatives considered**: keeping the window and widening the fallback condition to "no notifications before the window": cannot be known without reading before the window.
 
 ## R6. Discovering changes: polling, not `fs.watch`
 

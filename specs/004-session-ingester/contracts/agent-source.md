@@ -38,7 +38,6 @@ export interface TranscriptSourceOptions {
   root: string;                    // transcripts root, e.g. ~/.claude/projects
   mainAgentPattern: RegExp;
   pollIntervalMs?: number;         // default 500; 0 disables the timer (tests call refresh())
-  tailWindowBytes?: number;        // default 2 * 1024 * 1024
   resolveProject?: (cwd: string) => Promise<ProjectRef>; // default: git-based resolver (research R7)
 }
 
