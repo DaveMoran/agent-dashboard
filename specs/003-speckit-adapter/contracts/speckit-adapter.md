@@ -27,7 +27,8 @@ export function pickAuthoritative(
 ): FeatureCopy;
 
 // merged.ts
-export function isMergedIntoMain(root: string, dirName: string): Promise<boolean>; // never throws
+export function mergedMainTasks(root: string, dirName: string): Promise<Task[] | null>; // never throws
+export function isMergedIntoMain(root: string, dirName: string): Promise<boolean>; // (await mergedMainTasks(...)) !== null
 ```
 
 `FeatureCopy` and `Task` shapes are in [data-model.md](../data-model.md).
@@ -45,7 +46,7 @@ True when any root has a directory `.specify`, or a `specs/<name>/spec.md` file 
 1. `groupFeatureFiles(ctx.roots, files)`.
 2. `rootBranches`: `currentBranch(root)` for every root (once per scan).
 3. Group copies by `dirName`; `pickAuthoritative` per group.
-4. For each chosen copy: read `spec.md` (title), `tasks.md` if listed (tasks), check `plan.md` is listed, `isMergedIntoMain(copy.root, dirName)`, then `deriveStatus`.
+4. For each chosen copy: read `spec.md` (title), `tasks.md` if listed (tasks), check `plan.md` is listed, `mergedMainTasks(copy.root, dirName)`, then `deriveStatus`. When `mergedMainTasks` returns tasks, the spec's `tasks` are those tasks (from `main`), not the copy's.
 5. Return specs (mapping in the data model) sorted by `id`, then `dirName`.
 
 A file that cannot be read throws, which the 002 core reports as a failed scan (`stage: "parse"`) and keeps the last good snapshot. (A file deleted between discovery and parse is the usual cause; the next scan recovers.)
@@ -137,11 +138,13 @@ Expected `parseTasks` result, in order (`phase`/`parallel` absent where shown as
 
 ## Merged rule
 
-`isMergedIntoMain(root, dirName)`:
+`mergedMainTasks(root, dirName)`:
 
-1. `git rev-parse --verify --quiet refs/heads/main^{commit}` fails → false.
-2. `git show refs/heads/main:specs/<dirName>/tasks.md` fails → false.
-3. `parseTasks(stdout)` is empty → false.
-4. Every task done → true; otherwise false.
+1. `git rev-parse --verify --quiet refs/heads/main^{commit}` fails → null.
+2. `git show refs/heads/main:specs/<dirName>/tasks.md` fails → null.
+3. `parseTasks(stdout)` is empty → null.
+4. Every task done → those tasks; otherwise null.
+
+`isMergedIntoMain(root, dirName)` is `(await mergedMainTasks(root, dirName)) !== null`.
 
 Never throws (all git calls go through `runGit`).

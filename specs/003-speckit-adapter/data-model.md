@@ -52,7 +52,7 @@ Same as the core `Task`: `id`, `text`, `done`, and `phase` / `parallel` only whe
 | 5 | `hasPlan` | `planned` |
 | 6 | otherwise | `drafted` |
 
-`merged` comes from `isMergedIntoMain(root, dirName)`: true exactly when `refs/heads/main` resolves and `git show refs/heads/main:specs/<dirName>/tasks.md` succeeds and `parseTasks` of its output gives at least one task, all done.
+`merged` comes from `mergedMainTasks(root, dirName)` (non-null means merged; `isMergedIntoMain` is a wrapper): merged exactly when `refs/heads/main` resolves and `git show refs/heads/main:specs/<dirName>/tasks.md` succeeds and `parseTasks` of its output gives at least one task, all done.
 
 ## Mapping to `Spec`
 
@@ -62,7 +62,7 @@ Same as the core `Task`: `id`, `text`, `done`, and `phase` / `parallel` only whe
 | `title` | `parseTitle(spec.md)`; omitted when null |
 | `status` | `deriveStatus(...)` |
 | `dependsOn` | `[]` |
-| `tasks` | `parseTasks(tasks.md)`, or `[]` without `tasks.md` |
+| `tasks` | When merged: the tasks parsed from `main`'s `tasks.md`. Otherwise `parseTasks(tasks.md)` of the chosen copy, or `[]` without `tasks.md` |
 | `artifacts` | `FeatureCopy.files` |
 | `branch` | `FeatureCopy.dirName` |
 | `source` | `{ root, branch }` with `branch` = `currentBranch(root)`; `branch` omitted when null |

@@ -110,7 +110,7 @@ The developer runs a live check against this repository's own `specs/` folder an
 - A file in a feature directory is unreadable: the scan reports an issue for that path and continues with other features.
 - A worktree is on a detached HEAD: it still contributes its specs, but it never counts as having a feature branch checked out.
 - The visualizer is pointed at a subfolder of a worktree, or at the planner worktree rather than the main checkout: all worktrees of the repo are still found, and the path given is still treated as the first one.
-- A feature is merged into `main`, but the copy in some worktree still shows unticked tasks: the spec is `done`, since merging is the final word.
+- A feature is merged into `main`, but the copy in some worktree still shows unticked tasks (for example a planner worktree detached at an older commit): the spec is `done`, since merging is the final word, and its tasks are the ones on `main`, so it never shows as done with unfinished tasks.
 - Spec Kit's own `.specify/` folder, checklists, contracts and other files inside a feature directory never create extra specs; they are listed as artifacts of their feature.
 - A repo has `.specify/` but no feature directories yet: Spec Kit is detected and the picture is empty.
 
@@ -150,7 +150,7 @@ The developer runs a live check against this repository's own `specs/` folder an
 
 **Worktrees**
 
-- **FR-019**: When the same feature directory exists in several roots, the adapter MUST return exactly one spec for it, taken from the root whose checked-out branch equals the directory name; if no root has it checked out, from the first root in root order that has a copy.
+- **FR-019**: When the same feature directory exists in several roots, the adapter MUST return exactly one spec for it, taken from the root whose checked-out branch equals the directory name; if no root has it checked out, from the first root in root order that has a copy. When the feature is merged (FR-017), its tasks MUST be taken from `main`'s `tasks.md` instead of the chosen copy; every other field still comes from the chosen copy.
 - **FR-020**: A feature directory that exists in only one root, of any worktree and any branch, MUST appear.
 - **FR-021**: A listed worktree whose folder is missing or unreadable MUST be skipped with an issue naming its path; other worktrees MUST still be scanned.
 
