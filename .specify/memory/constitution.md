@@ -9,7 +9,7 @@ All work happens on a feature branch named after its spec (`NNN-feature-name`, a
 Every spec must update all documentation its change affects, in the same branch and PR. This includes the `README.md`, anything under `docs/`, `docs/master-spec.md` when decisions or architecture change, and inline docs for public interfaces. Each `tasks.md` must contain an explicit documentation task, and a feature is not complete until it is checked off.
 
 ### III. Read-Only Observer
-Agent Visualizer only observes the target repo, its Claude Code transcripts and its git history. It never writes to, commits to, or modifies the repo it is pointed at, and never edits transcript files. Any future control features need their own constitutional amendment.
+Agent Visualizer only observes the repos of the projects it shows, their Claude Code transcripts and their git history. It never writes to, commits to, or modifies an observed repo, and never edits transcript files. The optional attention hook, which the user installs in their own Claude Code settings, writes only into the visualizer's state directory; the visualizer never installs or edits hooks or settings itself. Any future control features (starting agents, sending them work, answering their prompts, running them through the Agent SDK) need their own constitutional amendment.
 
 ### IV. Framework-Agnostic Through Adapters
 Spec framework knowledge (Spec Kit, OpenSpec, BMAD, plain markdown) lives only inside adapters. Core code, ingesters and UI depend on the common spec model, never on a specific framework's file layout.
@@ -31,20 +31,24 @@ Commit work as it is done, not at the end. Each commit is one logical unit, typi
 - Bun for the runtime, package management and tests.
 - React with Vite for the UI; React Flow for graph views; Server-Sent Events for live updates.
 - Local-only: no network calls, telemetry or accounts.
+- UI/server boundary: the UI (`src/web/`) talks to the server only over HTTP and SSE, and imports no server code except the shared API contract module (`src/contract/`). Server code never imports UI code. This keeps the planned split into separate UI and MAGI server repos mechanical.
+- Desktop only: the minimum supported viewport width is 1024px. No layouts, breakpoints or tests for narrower screens. Keyboard navigation, light and dark themes and `prefers-reduced-motion` still apply.
 
 ## Development Workflow
 1. Planner (Claude, plan mode) writes the spec, plan and tasks on the feature branch. Before each step it verifies the previous step's files are committed, and it commits its own output when the step finishes (Principle VII).
-2. Coder (Qwen via Claude Code) implements the tasks on the same branch, checking each box in `tasks.md` as it completes it and committing logical units as it goes, each tagged `[spec-NNN]` (Principle VIII).
+2. Coder (Claude Sonnet, as a subagent of the planner's session or as a separate Claude Code session) implements the tasks on the same branch, checking each box in `tasks.md` as it completes it and committing logical units as it goes, each tagged `[spec-NNN]` (Principle VIII).
 3. Before opening the PR: tests pass, documentation task is complete, and the README and `docs/` reflect the change.
 4. The PR description summarizes the spec, links the spec directory and lists the documentation updated. A human reviews, commit by commit, and merges.
 
 ## Governance
 This constitution supersedes other practices. Amendments require a PR that updates this file with a version bump and a note explaining why. Every PR review verifies compliance with these principles, and any deviation must be justified in the plan's complexity section. Where practical, the non-negotiable rules are also enforced mechanically rather than by instruction alone: git hooks in `.githooks/` (no commits or pushes on `main`, required `[spec-NNN]` tag), GitHub branch protection on `main` (pull request required, including for the maintainer) and Claude Code settings and hooks in `.claude/` (blocked commands, commit-before-stop for the coder). `CLAUDE.md` holds the short operational form of these rules for agents; this file remains the source of truth.
 
-**Version**: 1.2.1 | **Ratified**: 2026-10-12 | **Last Amended**: 2026-10-12
+**Version**: 1.3.0 | **Ratified**: 2026-10-12 | **Last Amended**: 2026-10-15
 
 **Amendment 1.1.0**: Added Principle VII (commit at every workflow step) and Principle VIII (logical, incremental commits) so reviews can isolate each step and each level of logic.
 
 **Amendment 1.2.0**: Principle V now requires tests that can fail (the first coder run produced tests that passed with the code removed). Governance now records mechanical enforcement via `.githooks/` and `.claude/`, and `CLAUDE.md` as the operational summary.
 
 **Amendment 1.2.1**: Enforcement of Principle I extended to pushes (`.githooks/pre-push`) and to the remote (branch protection), after a direct push to `main` showed the commit-time guard was not enough.
+
+**Amendment 1.3.0**: The product became MAGI, a view of up to three projects at once, so Principle III now covers every observed project and spells out that the optional attention hook writes only to the visualizer's state directory and is installed by the user. Agent SDK mode joins the control features that need their own amendment. Added the desktop-only constraint (1024px minimum width) and the UI/server boundary, so the UI and the MAGI server can later move to separate repos without untangling code. The development workflow now names Sonnet as the coder, run either as a subagent of the planner or as a separate session, instead of Qwen.

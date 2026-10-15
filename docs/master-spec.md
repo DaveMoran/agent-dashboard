@@ -1,46 +1,57 @@
 # Agent Visualizer — Master Plan
 
 ## Context
-Every repo will run two Claude Code instances side by side:
-- **Planner** — Claude in plan mode, writes specs.
-- **Coder** — Qwen (30B+ coder) via Ollama, driven through Claude Code (`ANTHROPIC_BASE_URL` → Ollama), implements specs.
+Agent Visualizer is a small local web UI, styled after the MAGI from Neon Genesis Evangelion, that shows up to three Claude Code projects at once. Each project gets one of three "brains": MELCHIOR•1, BALTHASAR•2 and CASPER•3. A brain shows whether its project's agent is not active, on standby, working or waiting for the user. V1 is only that display. Later, clicking a brain opens the project: its sessions and subagents, its spec pipeline and a per-spec history.
 
-They hand off through spec files on disk. With ~20 specs per app it's hard to see what's planned, what's being built, what's blocked, and how a given spec actually went. **Agent Visualizer** is a small local web UI that *observes* (read-only in v1) the planner/coder pair for one repo and shows the spec pipeline plus a per-spec history. It must be **SDD-framework agnostic** (plain markdown, Spec Kit, OpenSpec, BMAD).
+The working setup it is built around: a main agent (Claude Opus or Fable) per project, which hands implementation to Claude Sonnet subagents. Projects use a spec-driven framework, so the tool stays **SDD-framework agnostic** (plain markdown, Spec Kit, OpenSpec, BMAD).
 
-The tool is **dogfooded**: built with the same Claude-planner + Qwen-coder pair using **Spec Kit**, so its own repo is the first live fixture.
+V1 only *observes* Claude Code. Controlling agents (talking to a brain, answering its prompts) comes later through the Claude Agent SDK, together with a hardware controller: a microphone with three buttons, one per brain.
+
+The tool is **dogfooded**: built with Spec Kit, so its own repo is the first live fixture.
 
 ## Decisions
 | Area | Decision |
 |---|---|
-| Role | Observe only (no orchestration) |
-| Scope | Single repo per run (`agent-visualizer <repo-path>`); fleet view later |
+| Role | Observe only in V1 (no orchestration). Control comes with the Agent SDK pivot (see Later) and needs a constitution amendment |
+| Scope | Up to three projects at once, one per brain. Projects are found from active Claude Code sessions; no repo path is needed. A fourth active project is not shown |
+| V1 scope | Only the three brains and their state (specs 004–008). Click-through, subagent details, spec board, graph, timeline and further adapters come later |
+| Brains | MELCHIOR (1), BALTHASAR (2), CASPER (3). A project takes the lowest free brain when its first main-agent session becomes active and keeps it while active; it is freed after all its main sessions end or idle past a timeout (default 30 min). No reshuffling |
+| Project | The git common dir of a session's `cwd` (all worktrees of a repo are one project), or the `cwd` itself outside git |
+| Main agent | A session whose model matches a configurable regex (default `^claude-(opus|fable)`). Only main agents light up a brain; subagents and other sessions show inside their project |
+| Brain states | not active (no project): black, red lettering; standby (agent idle): green; working: slow green↔blue pulse (≥ 2 s per cycle, steady under reduced motion); waiting for the user: red. Always shown as text too. Combined over the project's main sessions: waiting > working > standby. A running subagent keeps its main session working |
+| Waiting detection | Transcripts give working/standby. "Waiting" needs the opt-in attention hook, which the user installs in their own Claude Code settings and which writes only to the visualizer's state directory. Without it nothing is red |
+| Agent sources | Session state comes through an "agent source" interface: transcripts (004), attention hook (005), later the Agent SDK |
+| Platform | Desktop only, minimum width 1024px |
+| Repo layout | One repo for now: the UI (`src/web/`) and the local MAGI server. The UI reaches the server only over HTTP/SSE and imports only the shared contract module `src/contract/` (constitution, Technology Constraints). They move to separate repos later (see Later) |
 | Stack | TypeScript, Bun server, React + Vite UI, React Flow for DAG, SSE for live updates |
-| Views | Spec board/graph, per-spec timeline |
-| Build framework | Spec Kit (user familiar; 30B+ coder can follow it); constitution kept to a few lines |
-| Adapters | Spec Kit first (end-to-end with both views), then Plain-markdown, OpenSpec, BMAD |
+| Views | V1: MAGI panel only. Later: MAGI panel → project view (sessions + spec board/graph) → per-spec timeline |
+| Build framework | Spec Kit (user familiar; the coder can follow it); constitution kept to a few lines |
+| Adapters | Spec Kit first, then Plain-markdown, OpenSpec, BMAD |
 | Attribution | Spec status transitions + `[spec-NNN]` commit tags + git branch |
 | Spec location | Owned per adapter (auto-detected), overridable in config |
-| Coder model | Claude Sonnet is the coder for open-ended tasks. A local Qwen3-Coder-30B (Ollama) handled small explicit edits but shipped stubs and misreported progress on multi-step tasks, so it is limited to narrow, test-backed work. Spec 001 was built with Sonnet |
-| Worktrees | Planner and coder may run in separate git worktrees of one repo (so each can be on its own branch at the same time). The visualizer treats all worktrees of a repo as one project (identified by the git common dir) and merges their specs and transcripts. Handled in specs 003-005. |
+| Coder model | Claude Sonnet. From 004 on it runs as subagents of the main (Opus) session, matching the setup the tool visualizes. A local Qwen3-Coder-30B (Ollama) handled small explicit edits but shipped stubs and misreported progress on multi-step tasks; specs 001–003 were built with Sonnet as a separate session |
+| Worktrees | One project can span several git worktrees (identified by the git common dir); specs and transcripts from all of them are merged. Spec Kit handles this in 003 |
 | Git access | Read-only `git` subprocesses (`rev-parse`, `worktree list --porcelain`, `symbolic-ref`, `show`) with `GIT_OPTIONAL_LOCKS=0`, in `src/git/` |
-| Spec Kit worktree copies | The copy in the worktree that has the feature branch checked out wins; otherwise the path the user gave, then git's worktree order |
+| Spec Kit worktree copies | The copy in the worktree that has the feature branch checked out wins; otherwise the path the user gave, then git's worktree order. A merged feature takes its tasks from `main` |
 | Watching | Recursive watch per root, filtered by adapter patterns; 150 ms quiet period, 2 s maximum delay; full snapshot per notification |
 | Default port | `4317`; `--port` > `agent-visualizer.config.json` > default. If taken, fall back to a free port and say so |
-| State directory | `~/.agent-visualizer/instances/<repo-key>/server.json` (override root with `AGENT_VISUALIZER_STATE_DIR`); never inside the observed repo. The upcoming double-agent launcher skill reads `server.json` to find a running instance |
+| State directory | `~/.agent-visualizer/` (override with `AGENT_VISUALIZER_STATE_DIR`); never inside an observed repo. Per-repo instances use `instances/<repo-key>/server.json`; the no-path MAGI instance's location is decided in 006 |
 | Network binding | Loopback only (`127.0.0.1`) |
 | Dev mode | `bun run dev` runs Vite and the Bun server; the Bun server proxies HTTP to Vite and Vite's HMR WebSocket connects directly to the Vite port (5173) |
 
 ## Architecture
 ```
-repo ──► Adapters (Spec Kit | Plain | OpenSpec | BMAD) ──┐
-~/.claude/projects/<slug>/*.jsonl ──► Transcript ingester ─┼─► Event store (in-memory) ─► SSE ─► React UI
-git log / branches ──► Git ingester ───────────────────────┘
+~/.claude/projects/*/*.jsonl ──► Transcript source ─┐
+attention hook log ───────────► Hook source ───────┼─► Sessions + states ─► Brain slots (≤ 3 projects)
+                                                    │                              │
+project repos ──► Adapters (Spec Kit | Plain | OpenSpec | BMAD) ─────────────────┤
+git log / branches ──► Git ingester + attribution ───────────────────────────────┴─► Store ─► SSE ─► React UI
 ```
 
 **Common model** (what every adapter maps to):
 - `Spec { id, title, status, dependsOn[], tasks[{id, text, done, phase?, parallel?}], artifacts[paths], branch? }`
 - `status ∈ drafted | planned | ready | in-progress | review | done | blocked`
-- `Event { ts, role: planner|coder|human|git, specId?, kind: spec-created|status-change|task-checked|file-edit|bash|test-run|commit|prompt, detail }`
+- `Event { ts, sessionId?, agent: main|subagent|human|git, model?, specId?, kind: spec-created|status-change|task-checked|file-edit|bash|test-run|commit|prompt, detail }` (replaces the planner/coder `role` when the project view is built)
 
 **Adapter contract:** `detect(repo) → bool`, `discover(repo) → paths/globs to watch`, `parse(files) → Spec[]` (details in [`adapters.md`](adapters.md)). Status derivation per framework:
 - *Spec Kit:* `specs/NNN-feature/` — spec.md only → drafted; +plan.md → planned; +tasks.md → ready; some boxes checked → in-progress; all checked → review; fully ticked tasks.md on main → done (covers merge, squash and deleted branches). Feature branch `NNN-feature` gives attribution for free.
@@ -48,37 +59,39 @@ git log / branches ──► Git ingester ────────────�
 - *OpenSpec:* `openspec/changes/<id>/` (proposal.md, tasks.md); moved to archive → done.
 - *BMAD:* story files' `Status:` field (+ sprint status file if present); epics → grouping.
 
-**Transcript ingester:** tails JSONL for the repo's project slug; role by model ID (configurable regex, default `claude-*` → planner, `qwen*` → coder); records tool calls (Edit/Write → file-edit, Bash → bash/test-run), prompts, `gitBranch`, timestamps.
+**Transcript source:** tails every session JSONL under `~/.claude/projects/`, including subagent transcripts; groups sessions into projects; records prompts, tool calls (Edit/Write → file-edit, Bash → bash/test-run), model, `cwd`, `gitBranch`, timestamps.
 
 **Attribution order:** git branch on transcript entry → spec ID mentioned in prompt/commit → edited files ∈ spec's artifact/likely-files → time window between status transitions.
 
-## Views (v1)
-- **Spec board:** status columns, task progress bar ("6/9"), blocked/ready highlighting, live pulse on the spec the coder is touching. Toggle to **dependency graph** (React Flow).
-- **Per-spec timeline:** planner and coder swimlanes; spec authored/revised, status changes, task checks, file edits, test runs (pass/fail if detectable), commits; click event → detail drawer (diff path, command, prompt excerpt).
-
-## Deliverables of the planning phase (what happens after approval)
-**Acceptance criteria for this session = specs only.** No app code or scaffolding; the skeleton is feature 001, built by the planner/coder pair (validates the pipeline on an easy spec).
-1. Write this as `docs/master-spec.md` in `/Users/moda/Sites/agent-visualizer`, `git init`.
-2. User runs `specify init` (Spec Kit) in the repo; short constitution (TS strict, Bun, tests with `bun test`, small tasks for the Qwen coder).
-3. Produce the ordered feature list below as ready-to-paste `/speckit.specify` seed prompts in `docs/feature-seeds.md`, so the planner can generate each spec.
+## Views
+- **MAGI panel (V1, only screen):** three brains with their state, project name and state text. Display only.
+- **Project view (later):** the project's main sessions and subagents with state and a live feed; spec board with status columns, task progress ("6/9"), blocked/ready highlighting and a pulse on recently touched specs; toggle to **dependency graph** (React Flow).
+- **Per-spec timeline (later):** swimlanes for main agent, each subagent type and git; spec authored/revised, status changes, task checks, file edits, test runs (pass/fail if detectable), commits; click event → detail drawer.
 
 ## Feature specs (Spec Kit features, in build order)
-1. **001-server-skeleton** — Bun server, CLI arg for repo path, config file, health endpoint, Vite React shell.
-2. **002-common-model-adapter-interface** — types, adapter registry, auto-detect, file watcher with debounce.
-3. **003-speckit-adapter** — status derivation above; fixture: this repo.
-4. **004-transcript-ingester** — slug resolution, JSONL tailing, role detection, event normalization.
-5. **005-git-ingester-attribution** — log/branch reading, attribution pipeline.
-6. **006-live-updates** — SSE stream, client store.
-7. **007-spec-board** — board + progress + live pulse.
-8. **008-dependency-graph** — React Flow DAG view.
-9. **009-spec-timeline** — swimlanes + detail drawer.
-10. **010-plain-markdown-adapter**
-11. **011-openspec-adapter**
-12. **012-bmad-adapter**
+1. **001-server-skeleton** — Bun server, CLI arg for repo path, config file, health endpoint, Vite React shell. *(shipped)*
+2. **002-common-model-adapter-interface** — types, adapter registry, auto-detect, file watcher with debounce. *(shipped)*
+3. **003-speckit-adapter** — status derivation above, worktrees, merged rule. *(shipped)*
+4. **004-session-ingester** — all projects' JSONL, sessions → projects, main-agent rule, working/standby, agent-source interface.
+5. **005-attention-hook** — opt-in hook script and hook source for the waiting state.
+6. **006-magi-slots** — brain assignment and lifecycle, no repo path needed.
+7. **007-live-updates** — SSE stream of brain states, client store.
+8. **008-magi-panel** — the three brains. **End of V1.**
 
-Later (not v1): hooks for lower-latency events, multi-repo fleet view, metrics (time/tokens per spec, stall/loop detection), orchestration controls.
+After V1 (numbered when picked up): project view, git ingester and attribution, dependency graph, spec timeline, plain-markdown, OpenSpec and BMAD adapters.
+
+Seeds for each are in [`feature-seeds.md`](feature-seeds.md).
+
+## Later (not v1)
+- The spec and history views listed after V1 above.
+- **Agent SDK mode** (planned for when the hardware is ready): the visualizer hosts brains through the Claude Agent SDK, so "waiting" is exact and the user can talk to a brain and answer its prompts from the UI. The transcript and hook sources stay for Claude Code sessions. Needs a constitution amendment (control features, and network calls to the Anthropic API). Check SDK authentication and billing first.
+- **Brain API:** local endpoints to send a message to a brain, read what it is waiting on and get a short summary; the hardware is a client of it.
+- **Hardware controller:** a microphone with three buttons, one per brain. Press a button and speak to send that brain a message; tap a red brain to hear what it is waiting on.
+- Metrics (time and tokens per spec, stall and loop detection).
+- **Split the UI from the MAGI server** into two repos once the UI is solid: after the brain drill-down views (project view, sessions and subagents) have settled through a few versions. Split earlier if a second backend (the incident service) or a non-browser client (the hardware) arrives first. The UI keeps talking to the server over HTTP/SSE; `src/contract/` becomes a published, versioned schema that the UI pins and tests against. Separate repos also suit MAGI itself, since each repo is its own project on its own brain.
+- **Incident takeover:** a separate repo and service that receives production alerts (webhooks from monitoring) and decides when to page. When an incident opens, the UI shows a full-screen takeover styled after Evangelion's power timer: a countdown to when it becomes a real problem (ideally time until the error budget runs out at the current burn rate, not a fixed five minutes), STOP/SLOW/NORMAL/RACING as burn rate or severity, INTERNAL/EXTERNAL as the alert's source. It is network-facing, so it lives outside this repo's local-only, read-only rules; the UI's connection to it needs a constitution amendment. With SDK brains, an incident could be handed to a brain from the takeover screen. Starts only once there is an application in production with alerting.
 
 ## Verification
-- Unit: each adapter tested against a fixture repo under `fixtures/<framework>/` (`bun test`); transcript ingester against a recorded sample JSONL.
-- End-to-end: run `bun run dev -- /Users/moda/Sites/agent-visualizer`, open the UI, confirm the board reflects the repo's own Spec Kit specs; tick a box in a `tasks.md` and confirm the card updates live; run a coder session and confirm its edits appear in that spec's timeline coder lane.
-- Dogfood check: by feature 009, the visualizer should accurately show its own build history.
+- Unit: each adapter tested against a fixture repo under `fixtures/<framework>/` (`bun test`); transcript and hook sources against recorded samples in `fixtures/`.
+- End-to-end: start `agent-visualizer`, start an Opus session in this repo and confirm MELCHIOR turns green, pulses while it works and (with the hook) goes red on a permission prompt; start a session in a second project and confirm BALTHASAR takes it; end both and confirm the brains return to not active after the timeout.
+- Dogfood check: once 008 lands, MELCHIOR should show this repo's own session going between standby, working and waiting.

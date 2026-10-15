@@ -1,6 +1,6 @@
 # Agent Visualizer
 
-Agent Visualizer is a small local web UI that observes the planner/coder agent pair working in one repository. Point it at a repo and it serves a page in your browser. It is **read-only**: it never writes into the repo it observes.
+Agent Visualizer is a small local web UI that observes Claude Code agents at work. Point it at a repo and it serves a page in your browser. It is **read-only**: it never writes into the repo it observes. It is heading toward MAGI: a desktop view of up to three projects at once, one per "brain" (MELCHIOR, BALTHASAR, CASPER), each showing whether its agents are ready, working or waiting for you (see [`docs/master-spec.md`](docs/master-spec.md)).
 
 This is the server skeleton (spec `001-server-skeleton`) plus the shared spec model, adapter contract and spec watcher (spec `002-common-model-adapter-interface`). The server, CLI, health endpoint, discovery record and a placeholder page showing the repo name are in place, and the core can validate adapter output, select an adapter, scan and watch spec files. The Spec Kit adapter (spec `003-speckit-adapter`) now reads specs from every worktree of a repo; the spec board and the timeline come in later specs (see [`docs/master-spec.md`](docs/master-spec.md)).
 
@@ -159,7 +159,7 @@ docs/                  Master spec, feature seeds, local setup
 
 ## Contributing
 
-Work is done by two agent sessions: a **planner** (Claude, plan mode) that writes specs, and a **coder** that implements them. The coder is currently Claude Sonnet; a local model (Qwen3-Coder via Ollama through Claude Code) also works for small, explicit tasks, with the setup and its limits described in [`docs/local-setup.md`](docs/local-setup.md). They hand off through the spec files in `specs/`. Setup, shell helpers and guardrails are in [`docs/local-setup.md`](docs/local-setup.md); the project principles are in [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
+Work is done by a **planner** (Claude Opus, plan mode) that writes specs and a **coder** (Claude Sonnet) that implements them. Specs 001–003 used two separate sessions; from 004 on the coder runs as Sonnet subagents of the planner's session. Specs 001–003 also tried a local model (Qwen3-Coder via Ollama through Claude Code), which works for small, explicit tasks, with the setup and its limits described in [`docs/local-setup.md`](docs/local-setup.md). They hand off through the spec files in `specs/`. Setup, shell helpers and guardrails are in [`docs/local-setup.md`](docs/local-setup.md); the project principles are in [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
 
 - One feature branch (`NNN-feature-name`) and one pull request per spec. Never commit to `main`.
 - Commit one logical unit at a time; every commit subject ends with `[spec-NNN]`.
