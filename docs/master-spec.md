@@ -1,7 +1,7 @@
 # Agent Visualizer — Master Plan
 
 ## Context
-Agent Visualizer is a small local web UI, styled after the MAGI from Neon Genesis Evangelion, that shows up to three Claude Code projects at once. Each project gets one of three "brains": MELCHIOR•1, BALTHASAR•2 and CASPER•3. A brain shows whether its project's agents are on standby, ready, working or waiting for the user. Clicking a brain opens that project: its sessions and subagents, its spec pipeline and a per-spec history.
+Agent Visualizer is a small local web UI, styled after the MAGI from Neon Genesis Evangelion, that shows up to three Claude Code projects at once. Each project gets one of three "brains": MELCHIOR•1, BALTHASAR•2 and CASPER•3. A brain shows whether its project's agent is not active, on standby, working or waiting for the user. V1 is only that display. Later, clicking a brain opens the project: its sessions and subagents, its spec pipeline and a per-spec history.
 
 The working setup it is built around: a main agent (Claude Opus or Fable) per project, which hands implementation to Claude Sonnet subagents. Projects use a spec-driven framework, so the tool stays **SDD-framework agnostic** (plain markdown, Spec Kit, OpenSpec, BMAD).
 
@@ -13,16 +13,17 @@ The tool is **dogfooded**: built with Spec Kit, so its own repo is the first liv
 | Area | Decision |
 |---|---|
 | Role | Observe only in V1 (no orchestration). Control comes with the Agent SDK pivot (see Later) and needs a constitution amendment |
-| Scope | Up to three projects at once, one per brain. Projects are found from active Claude Code sessions; repo paths on the command line pin projects to brains. A fourth active project is not shown |
+| Scope | Up to three projects at once, one per brain. Projects are found from active Claude Code sessions; no repo path is needed. A fourth active project is not shown |
+| V1 scope | Only the three brains and their state (specs 004–008). Click-through, subagent details, spec board, graph, timeline and further adapters come later |
 | Brains | MELCHIOR (1), BALTHASAR (2), CASPER (3). A project takes the lowest free brain when its first main-agent session becomes active and keeps it while active; it is freed after all its main sessions end or idle past a timeout (default 30 min). No reshuffling |
 | Project | The git common dir of a session's `cwd` (all worktrees of a repo are one project), or the `cwd` itself outside git |
 | Main agent | A session whose model matches a configurable regex (default `^claude-(opus|fable)`). Only main agents light up a brain; subagents and other sessions show inside their project |
-| Brain states | standby (no project): black, red lettering; ready: green; working: slow green↔blue pulse (≥ 2 s per cycle, steady under reduced motion); waiting for the user: red. Always shown as text too. Combined over the project's sessions: waiting > working > ready |
-| Waiting detection | Transcripts give working/ready. "Waiting" needs the opt-in attention hook, which the user installs in their own Claude Code settings and which writes only to the visualizer's state directory. Without it nothing is red |
-| Agent sources | Session data comes through an "agent source" interface: transcripts (004), attention hook (005), later the Agent SDK |
+| Brain states | not active (no project): black, red lettering; standby (agent idle): green; working: slow green↔blue pulse (≥ 2 s per cycle, steady under reduced motion); waiting for the user: red. Always shown as text too. Combined over the project's main sessions: waiting > working > standby. A running subagent keeps its main session working |
+| Waiting detection | Transcripts give working/standby. "Waiting" needs the opt-in attention hook, which the user installs in their own Claude Code settings and which writes only to the visualizer's state directory. Without it nothing is red |
+| Agent sources | Session state comes through an "agent source" interface: transcripts (004), attention hook (005), later the Agent SDK |
 | Platform | Desktop only, minimum width 1024px |
 | Stack | TypeScript, Bun server, React + Vite UI, React Flow for DAG, SSE for live updates |
-| Views | MAGI panel (home) → project view (sessions + spec board/graph) → per-spec timeline |
+| Views | V1: MAGI panel only. Later: MAGI panel → project view (sessions + spec board/graph) → per-spec timeline |
 | Build framework | Spec Kit (user familiar; the coder can follow it); constitution kept to a few lines |
 | Adapters | Spec Kit first, then Plain-markdown, OpenSpec, BMAD |
 | Attribution | Spec status transitions + `[spec-NNN]` commit tags + git branch |
@@ -49,7 +50,7 @@ git log / branches ──► Git ingester + attribution ────────
 **Common model** (what every adapter maps to):
 - `Spec { id, title, status, dependsOn[], tasks[{id, text, done, phase?, parallel?}], artifacts[paths], branch? }`
 - `status ∈ drafted | planned | ready | in-progress | review | done | blocked`
-- `Event { ts, sessionId?, agent: main|subagent|human|git, model?, specId?, kind: spec-created|status-change|task-checked|file-edit|bash|test-run|commit|prompt, detail }` (replaces the planner/coder `role` in 004)
+- `Event { ts, sessionId?, agent: main|subagent|human|git, model?, specId?, kind: spec-created|status-change|task-checked|file-edit|bash|test-run|commit|prompt, detail }` (replaces the planner/coder `role` when the project view is built)
 
 **Adapter contract:** `detect(repo) → bool`, `discover(repo) → paths/globs to watch`, `parse(files) → Spec[]` (details in [`adapters.md`](adapters.md)). Status derivation per framework:
 - *Spec Kit:* `specs/NNN-feature/` — spec.md only → drafted; +plan.md → planned; +tasks.md → ready; some boxes checked → in-progress; all checked → review; fully ticked tasks.md on main → done (covers merge, squash and deleted branches). Feature branch `NNN-feature` gives attribution for free.
@@ -61,31 +62,27 @@ git log / branches ──► Git ingester + attribution ────────
 
 **Attribution order:** git branch on transcript entry → spec ID mentioned in prompt/commit → edited files ∈ spec's artifact/likely-files → time window between status transitions.
 
-## Views (v1)
-- **MAGI panel (home):** three brains with their state, project name and state text.
-- **Project view:** the project's main sessions and subagents with state and a live feed; spec board with status columns, task progress ("6/9"), blocked/ready highlighting and a pulse on recently touched specs; toggle to **dependency graph** (React Flow).
-- **Per-spec timeline:** swimlanes for main agent, each subagent type and git; spec authored/revised, status changes, task checks, file edits, test runs (pass/fail if detectable), commits; click event → detail drawer.
+## Views
+- **MAGI panel (V1, only screen):** three brains with their state, project name and state text. Display only.
+- **Project view (later):** the project's main sessions and subagents with state and a live feed; spec board with status columns, task progress ("6/9"), blocked/ready highlighting and a pulse on recently touched specs; toggle to **dependency graph** (React Flow).
+- **Per-spec timeline (later):** swimlanes for main agent, each subagent type and git; spec authored/revised, status changes, task checks, file edits, test runs (pass/fail if detectable), commits; click event → detail drawer.
 
 ## Feature specs (Spec Kit features, in build order)
 1. **001-server-skeleton** — Bun server, CLI arg for repo path, config file, health endpoint, Vite React shell. *(shipped)*
 2. **002-common-model-adapter-interface** — types, adapter registry, auto-detect, file watcher with debounce. *(shipped)*
 3. **003-speckit-adapter** — status derivation above, worktrees, merged rule. *(shipped)*
-4. **004-transcript-ingester** — all projects' JSONL incl. subagents, sessions → projects, main-agent rule, working/ready, agent-source interface.
+4. **004-session-ingester** — all projects' JSONL, sessions → projects, main-agent rule, working/standby, agent-source interface.
 5. **005-attention-hook** — opt-in hook script and hook source for the waiting state.
-6. **006-magi-slots** — brain assignment and lifecycle, per-project spec scans, optional repo path.
-7. **007-git-ingester-attribution** — log/branch reading per project, attribution pipeline.
-8. **008-live-updates** — SSE stream (brains, specs, events), client store.
-9. **009-magi-panel** — home screen.
-10. **010-project-view** — sessions/subagents strip + spec board.
-11. **011-dependency-graph** — React Flow DAG view.
-12. **012-spec-timeline** — swimlanes + detail drawer.
-13. **013-plain-markdown-adapter**
-14. **014-openspec-adapter**
-15. **015-bmad-adapter**
+6. **006-magi-slots** — brain assignment and lifecycle, no repo path needed.
+7. **007-live-updates** — SSE stream of brain states, client store.
+8. **008-magi-panel** — the three brains. **End of V1.**
+
+After V1 (numbered when picked up): project view, git ingester and attribution, dependency graph, spec timeline, plain-markdown, OpenSpec and BMAD adapters.
 
 Seeds for each are in [`feature-seeds.md`](feature-seeds.md).
 
 ## Later (not v1)
+- The spec and history views listed after V1 above.
 - **Agent SDK mode** (planned for when the hardware is ready): the visualizer hosts brains through the Claude Agent SDK, so "waiting" is exact and the user can talk to a brain and answer its prompts from the UI. The transcript and hook sources stay for Claude Code sessions. Needs a constitution amendment (control features, and network calls to the Anthropic API). Check SDK authentication and billing first.
 - **Brain API:** local endpoints to send a message to a brain, read what it is waiting on and get a short summary; the hardware is a client of it.
 - **Hardware controller:** a microphone with three buttons, one per brain. Press a button and speak to send that brain a message; tap a red brain to hear what it is waiting on.
@@ -93,5 +90,5 @@ Seeds for each are in [`feature-seeds.md`](feature-seeds.md).
 
 ## Verification
 - Unit: each adapter tested against a fixture repo under `fixtures/<framework>/` (`bun test`); transcript and hook sources against recorded samples in `fixtures/`.
-- End-to-end: start `agent-visualizer`, start an Opus session in this repo and confirm MELCHIOR turns green, pulses while it works and (with the hook) goes red on a permission prompt; start a second project and confirm BALTHASAR takes it; open MELCHIOR and confirm the board reflects this repo's specs, a ticked box updates live and subagent edits appear in the spec's timeline.
-- Dogfood check: by feature 012, the visualizer should accurately show its own build history.
+- End-to-end: start `agent-visualizer`, start an Opus session in this repo and confirm MELCHIOR turns green, pulses while it works and (with the hook) goes red on a permission prompt; start a session in a second project and confirm BALTHASAR takes it; end both and confirm the brains return to not active after the timeout.
+- Dogfood check: once 008 lands, MELCHIOR should show this repo's own session going between standby, working and waiting.
