@@ -18,5 +18,12 @@ Principles and reasons live in `.specify/memory/constitution.md`. This is the sh
 - If the same command fails twice, stop and explain in your reply. Do not try a third approach.
 - Read large files in pieces (offset and limit). Your context window is limited.
 
+## Parallel tasks (planner running /speckit-implement)
+- Run coder subagents one at a time by default.
+- `[P]` tasks in the same phase may run as parallel coder subagents in this checkout (no worktrees). Tell each one it is in parallel mode and name its files.
+- A parallel coder writes only the files its task names, runs only its own test file (`bun test tests/<file>.test.ts`), and does not commit, tick `tasks.md` or run `bun run verify`.
+- When the batch is done, the planner runs `bun run verify` once, then commits each task separately in task-ID order, with its box ticked in that commit.
+- Never run tasks in parallel that touch the same file, add a dependency, or need the full test suite or a build to check them.
+
 ## Commands
 `bun install` · `bun run dev -- <repo-path>` · `bun run build` · `bun test` · `bun run verify`

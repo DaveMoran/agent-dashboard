@@ -26,5 +26,13 @@ Principles and reasons live in `.specify/memory/constitution.md`. Read it once i
 - Read large files in pieces (offset and limit).
 - Do not push, open PRs, or touch other branches or worktrees.
 
+## Parallel mode
+If the planner says you are running in parallel mode, other coders are working in this checkout at the same time. Then, instead of the commit and verify rules above:
+- Skip the clean-working-tree check (other coders' files will show as uncommitted).
+- Create or change only the files your task names. If the task needs any other file changed, stop and report.
+- Check your work with `bun test <your test file>` only. Do not run `bun run verify` or the whole suite.
+- Do not commit, do not tick `tasks.md`, and do not run `git add`, `git stash`, `git checkout` or anything else that touches other files.
+- In your report, list every file you created or changed instead of commit hashes.
+
 ## Report
-When done or stopped, reply with: the tasks completed (IDs and commit hashes), the result of the last `bun run verify`, and anything left unfinished or that the planner should decide.
+When done or stopped, reply with: the tasks completed (IDs and commit hashes, or in parallel mode the files changed), the result of the last `bun run verify` (or in parallel mode, of your own test file), and anything left unfinished or that the planner should decide.
