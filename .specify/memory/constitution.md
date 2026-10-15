@@ -36,14 +36,14 @@ Commit work as it is done, not at the end. Each commit is one logical unit, typi
 
 ## Development Workflow
 1. Planner (Claude, plan mode) writes the spec, plan and tasks on the feature branch. Before each step it verifies the previous step's files are committed, and it commits its own output when the step finishes (Principle VII).
-2. Coder (Claude Sonnet, as a subagent of the planner's session or as a separate Claude Code session) implements the tasks on the same branch, checking each box in `tasks.md` as it completes it and committing logical units as it goes, each tagged `[spec-NNN]` (Principle VIII).
+2. Coder (Claude Sonnet, as a subagent of the planner's session or as a separate Claude Code session) implements the tasks on the same branch, checking each box in `tasks.md` as it completes it and committing logical units as it goes, each tagged `[spec-NNN]` (Principle VIII). Tasks marked `[P]` in the same phase may run as parallel coder subagents in the same checkout; parallel coders write only their task's files and do not commit, and the planner then verifies the batch once and commits each task separately in task order with its box ticked.
 3. Before opening the PR: tests pass, documentation task is complete, and the README and `docs/` reflect the change.
 4. The PR description summarizes the spec, links the spec directory and lists the documentation updated. A human reviews, commit by commit, and merges.
 
 ## Governance
 This constitution supersedes other practices. Amendments require a PR that updates this file with a version bump and a note explaining why. Every PR review verifies compliance with these principles, and any deviation must be justified in the plan's complexity section. Where practical, the non-negotiable rules are also enforced mechanically rather than by instruction alone: git hooks in `.githooks/` (no commits or pushes on `main`, required `[spec-NNN]` tag), GitHub branch protection on `main` (pull request required, including for the maintainer) and Claude Code settings and hooks in `.claude/` (blocked commands, commit-before-stop for the coder). `CLAUDE.md` holds the short operational form of these rules for agents; this file remains the source of truth.
 
-**Version**: 1.3.0 | **Ratified**: 2026-10-12 | **Last Amended**: 2026-10-15
+**Version**: 1.3.1 | **Ratified**: 2026-10-12 | **Last Amended**: 2026-10-15
 
 **Amendment 1.1.0**: Added Principle VII (commit at every workflow step) and Principle VIII (logical, incremental commits) so reviews can isolate each step and each level of logic.
 
@@ -52,3 +52,5 @@ This constitution supersedes other practices. Amendments require a PR that updat
 **Amendment 1.2.1**: Enforcement of Principle I extended to pushes (`.githooks/pre-push`) and to the remote (branch protection), after a direct push to `main` showed the commit-time guard was not enough.
 
 **Amendment 1.3.0**: The product became MAGI, a view of up to three projects at once, so Principle III now covers every observed project and spells out that the optional attention hook writes only to the visualizer's state directory and is installed by the user. Agent SDK mode joins the control features that need their own amendment. Added the desktop-only constraint (1024px minimum width) and the UI/server boundary, so the UI and the MAGI server can later move to separate repos without untangling code. The development workflow now names Sonnet as the coder, run either as a subagent of the planner or as a separate session, instead of Qwen.
+
+**Amendment 1.3.1**: `[P]` tasks may run as parallel coder subagents in one checkout, with the planner doing the commits, so a wide phase does not have to run one task at a time. Worktrees are not used for this: parallel tasks touch different files by definition, and the planner keeps one commit per task with its box ticked.

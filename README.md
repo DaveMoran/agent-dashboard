@@ -67,8 +67,44 @@ Every non-zero exit prints a message to stderr naming the specific problem. For 
 |---|---|
 | `GET /api/health` | `200` `{ "status": "ok", "repoPath": "...", "repoName": "...", "version": "..." }` |
 | other methods on `/api/health` | `405` |
+| `GET /api/sessions` | `200` `SessionsResponse`: the projects with at least one main-agent session (see below) |
+| other methods on `/api/sessions` | `405` with `Allow: GET` |
 | any other `/api/...` path | `404` `{ "error": "not_found" }` |
 | anything else | the built UI from `dist/web` (unknown paths without a file extension fall back to `index.html`); `503` with a hint if the UI is not built |
+
+#### `GET /api/sessions`
+
+Returns the Claude Code projects found in the transcripts and their main-agent sessions. Types are in `src/contract/sessions.ts`. Projects and sessions are sorted by `lastActivity`, newest first (ties by id). Without a transcript source the body is `{ "projects": [] }`. A subagent task notification, whether a user message or a queued `attachment` line, closes that subagent, and a `continued-in` line ends its session (standby, no running subagents).
+
+```json
+{
+  "projects": [
+    {
+      "id": "/Users/me/Sites/agent-visualizer/.git",
+      "name": "agent-visualizer",
+      "lastActivity": "2026-10-15T10:03:05.100Z",
+      "sessions": [
+        {
+          "sessionId": "7ec15f17-34b7-46b3-8616-2a43c9b59191",
+          "model": "claude-opus-5-5",
+          "cwd": "/Users/me/Sites/agent-visualizer",
+          "state": "standby",
+          "runningSubagents": 0,
+          "stateSince": "2026-10-15T10:03:05.000Z",
+          "lastActivity": "2026-10-15T10:03:05.100Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+- A **project** is the git common dir of a session's `cwd`, so all worktrees of a repo are one project; outside git it is the `cwd` itself.
+- Only **main-agent** sessions are listed: those whose model matches `mainAgentModel` (see Config file).
+- `state` is `"working"` or `"standby"`. A session is `working` after a prompt, tool call or tool result, until a final reply, a turn-end marker or an interrupt ends the turn. It is also `working` while any subagent is running, even if its own turn has ended.
+- `runningSubagents` counts the session's subagents that are still running, background ones included. A subagent counts as running while its own transcript says it is working and the main session has not recorded a completion notice for it.
+- `stateSince` is when the state last changed (`null` if unknown). `lastActivity` is the newest timestamp over the session and its subagent transcripts.
+- Known limitation: a subagent that dies with neither a final reply nor a completion notice keeps its session `working` until the idle timeout planned for spec 006.
 
 ## Config file
 
@@ -78,13 +114,17 @@ Optional `agent-visualizer.config.json`. The first file found wins (no merging):
 2. `./agent-visualizer.config.json` in the current working directory
 
 ```json
-{ "port": 4317, "adapter": "some-adapter-name" }
+{ "port": 4317, "adapter": "some-adapter-name", "mainAgentModel": "^claude-(opus|fable)", "transcriptsDir": "~/.claude/projects" }
 ```
 
 | Key | Type | Notes |
 |---|---|---|
 | `port` | integer 1-65535 | Preferred port. |
 | `adapter` | non-empty string | Forces the named spec adapter instead of auto-detection. A value that is not a non-empty string, or a name that is not registered, exits 1 with a message (see [`docs/adapters.md`](docs/adapters.md)). |
+| `mainAgentModel` | non-empty string (regex) | Sessions whose model matches are main agents. Default `^claude-(opus|fable)`. A string that is not a valid regex does not stop startup: a warning naming the setting is printed to stderr and the default is used. |
+| `transcriptsDir` | non-empty string | Where Claude Code transcripts are read from. Default `~/.claude/projects`. `~/` expands to your home directory; a relative path is resolved against the directory of the config file. |
+
+The environment variable `AGENT_VISUALIZER_TRANSCRIPTS_DIR` overrides `transcriptsDir`. The CLI prints the directory it reads as `Transcripts: <path>` on startup. The transcripts are polled every 500 ms; a missing directory is not an error and shows no sessions until it appears.
 
 Unknown keys are ignored. The top level must be a JSON object. Precedence: `--port` flag > config file > built-in default (`4317`). Invalid JSON or values exit with code 1 and a message naming the file.
 
@@ -131,7 +171,7 @@ Spec data reaches the app through adapters, one per spec framework, all mapping 
 
 ## Read-only guarantee
 
-Agent Visualizer only reads the repo it is pointed at. All state it writes (`server.json`) goes to the state directory above, never into the repo. An end-to-end test snapshots the repo directory before start and after shutdown and asserts they are identical.
+Agent Visualizer only reads the repo it is pointed at. All state it writes (`server.json`) goes to the state directory above, never into the repo. Claude Code transcripts under `transcriptsDir` are only read, never written. An end-to-end test snapshots the repo directory before start and after shutdown and asserts they are identical.
 
 ## Project structure
 
@@ -145,6 +185,8 @@ src/server/port.ts     Port fallback
 src/server/routes.ts   HTTP handler: health, static files, dev proxy
 src/server/start.ts    Bun.serve wrapper (startServer)
 src/server/errors.ts   AppError (exit 1) and UsageError (exit 2)
+src/contract/          Shared types between server and UI (`sessions.ts`); imports nothing from the server
+src/agents/            Agent sources: the source interface, main-agent rule, and `transcripts/` (Claude Code JSONL tailing, session state, subagents)
 src/core/              Shared spec model, adapter contract, validation, registry, scan and watcher (no framework names)
 src/git/               Read-only git access (runGit, worktree roots)
 src/adapters/          Registered spec adapters (`index.ts`)

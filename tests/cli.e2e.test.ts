@@ -2,6 +2,9 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { addWorktree, commitAll, makeGitRepo } from "./git-helpers";
+import { cleanupFixtures } from "./helpers";
+import { materializeTranscripts } from "./transcript-fixtures";
 import pkg from "../package.json" with { type: "json" };
 
 const CLI = path.resolve(import.meta.dir, "../src/cli/index.ts");
@@ -9,25 +12,34 @@ const CLI = path.resolve(import.meta.dir, "../src/cli/index.ts");
 let tmp: string;
 let repoDir: string;
 let stateDir: string;
+let emptyTranscripts: string;
 let children: Array<ReturnType<typeof Bun.spawn>>;
 
 beforeEach(() => {
   tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "cli-e2e-")));
   repoDir = path.join(tmp, "demo-repo");
   stateDir = path.join(tmp, "state");
+  emptyTranscripts = path.join(tmp, "transcripts");
   fs.mkdirSync(repoDir);
+  fs.mkdirSync(emptyTranscripts);
   children = [];
 });
 
-afterEach(() => {
+afterEach(async () => {
   for (const child of children) child.kill("SIGKILL");
   fs.rmSync(tmp, { recursive: true, force: true });
+  await cleanupFixtures();
 });
 
 function spawnCli(args: string[], env: Record<string, string> = {}) {
   const child = Bun.spawn(["bun", CLI, ...args], {
     cwd: tmp,
-    env: { ...process.env, AGENT_VISUALIZER_STATE_DIR: stateDir, ...env },
+    env: {
+      ...process.env,
+      AGENT_VISUALIZER_STATE_DIR: stateDir,
+      AGENT_VISUALIZER_TRANSCRIPTS_DIR: emptyTranscripts,
+      ...env,
+    },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -127,13 +139,14 @@ test("--version exits 0 and prints the package version", async () => {
   expect(stdout.trim()).toBe("0.1.0");
 });
 
-test("successful start prints the three startup lines and serves health", async () => {
+test("successful start prints the startup lines and serves health", async () => {
   const port = await freePort();
   const child = spawnCli([repoDir, "--port", String(port)]);
   const out = await readUntil(child.stdout as ReadableStream<Uint8Array>, "Listening:");
   expect(out.trimEnd().split("\n")).toEqual([
     `Agent Visualizer ${pkg.version}`,
     `Observing: ${repoDir}`,
+    `Transcripts: ${emptyTranscripts}`,
     `Listening: http://127.0.0.1:${port}`,
   ]);
   const health = await (await fetch(`http://127.0.0.1:${port}/api/health`)).json();
@@ -377,7 +390,7 @@ test("non-string adapter in config exits 1 with the invalid-config message", asy
   );
 });
 
-test("a config without an adapter key still prints exactly the three startup lines", async () => {
+test("a config without an adapter key still prints exactly the startup lines", async () => {
   const port = await freePort();
   fs.writeFileSync(path.join(repoDir, CONFIG_NAME), JSON.stringify({ port }));
   const child = spawnCli([repoDir]);
@@ -386,6 +399,7 @@ test("a config without an adapter key still prints exactly the three startup lin
   expect(out.trimEnd().split("\n")).toEqual([
     `Agent Visualizer ${pkg.version}`,
     `Observing: ${repoDir}`,
+    `Transcripts: ${emptyTranscripts}`,
     `Listening: http://127.0.0.1:${port}`,
   ]);
 });
@@ -399,4 +413,56 @@ test("no config file: the default port 4317 is requested", async () => {
   const stderr = await new Response(child.stderr as ReadableStream).text();
   if (actual === 4317) expect(stderr).not.toContain("is in use");
   else expect(stderr).toContain(`Port 4317 is in use; using ${actual}.`);
+});
+
+test("GET /api/sessions lists the two-worktrees sessions as one project, working first", async () => {
+  const repo = await makeGitRepo();
+  await commitAll(repo, "init");
+  const worktree = await addWorktree(repo, { newBranch: "wt" });
+  const root = await materializeTranscripts("two-worktrees", { REPO: repo, WORKTREE: worktree });
+  const port = await freePort();
+  const { child } = await startAndWait([repoDir, "--port", String(port)], {
+    AGENT_VISUALIZER_TRANSCRIPTS_DIR: root,
+  });
+  try {
+    const body = (await (await fetch(`http://127.0.0.1:${port}/api/sessions`)).json()) as {
+      projects: { id: string; sessions: { sessionId: string; state: string }[] }[];
+    };
+    expect(body.projects).toHaveLength(1);
+    expect(body.projects[0]!.id).toBe(path.join(repo, ".git"));
+    const sessions = body.projects[0]!.sessions;
+    expect(sessions).toHaveLength(2);
+    expect(sessions[0]!.sessionId.startsWith("77777777")).toBe(true);
+    expect(sessions[0]!.state).toBe("working");
+    expect(sessions[1]!.state).toBe("standby");
+  } finally {
+    child.kill("SIGINT");
+    await child.exited;
+  }
+});
+
+test("an invalid mainAgentModel warns on stderr and the server still starts", async () => {
+  fs.writeFileSync(path.join(repoDir, CONFIG_NAME), JSON.stringify({ mainAgentModel: "(" }));
+  const port = await freePort();
+  const { child } = await startAndWait([repoDir, "--port", String(port)]);
+  try {
+    const health = await fetch(`http://127.0.0.1:${port}/api/health`);
+    expect(health.status).toBe(200);
+  } finally {
+    child.kill("SIGINT");
+  }
+  const [stderr] = await Promise.all([
+    new Response(child.stderr as ReadableStream).text(),
+    child.exited,
+  ]);
+  expect(stderr).toContain("mainAgentModel");
+});
+
+test("startup output names the transcripts directory", async () => {
+  const dir = path.join(tmp, "custom-transcripts");
+  fs.mkdirSync(dir);
+  const { child, out } = await startAndWait([repoDir], { AGENT_VISUALIZER_TRANSCRIPTS_DIR: dir });
+  child.kill("SIGINT");
+  await child.exited;
+  expect(out).toContain(`Transcripts: ${dir}\n`);
 });

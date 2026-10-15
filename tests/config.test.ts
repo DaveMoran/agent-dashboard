@@ -22,23 +22,23 @@ afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 const put = (dir: string, content: string) => fs.writeFileSync(path.join(dir, NAME), content);
 
 test("no file returns undefined port and source", async () => {
-  expect(await loadConfig(repo, cwd)).toEqual({ port: undefined, adapter: undefined, source: undefined });
+  expect(await loadConfig(repo, cwd)).toStrictEqual({ port: undefined, adapter: undefined, mainAgentModel: undefined, transcriptsDir: undefined, source: undefined });
 });
 
 test("file in repo only", async () => {
   put(repo, '{"port": 4400}');
-  expect(await loadConfig(repo, cwd)).toEqual({ port: 4400, adapter: undefined, source: path.join(repo, NAME) });
+  expect(await loadConfig(repo, cwd)).toStrictEqual({ port: 4400, adapter: undefined, mainAgentModel: undefined, transcriptsDir: undefined, source: path.join(repo, NAME) });
 });
 
 test("file in cwd only", async () => {
   put(cwd, '{"port": 4401}');
-  expect(await loadConfig(repo, cwd)).toEqual({ port: 4401, adapter: undefined, source: path.join(cwd, NAME) });
+  expect(await loadConfig(repo, cwd)).toStrictEqual({ port: 4401, adapter: undefined, mainAgentModel: undefined, transcriptsDir: undefined, source: path.join(cwd, NAME) });
 });
 
 test("both present: repo wins, no merging", async () => {
   put(repo, "{}");
   put(cwd, '{"port": 4402}');
-  expect(await loadConfig(repo, cwd)).toEqual({ port: undefined, adapter: undefined, source: path.join(repo, NAME) });
+  expect(await loadConfig(repo, cwd)).toStrictEqual({ port: undefined, adapter: undefined, mainAgentModel: undefined, transcriptsDir: undefined, source: path.join(repo, NAME) });
 });
 
 test("cwd defaults to process.cwd()", async () => {
@@ -96,7 +96,7 @@ test("port boundaries 1 and 65535 are accepted", async () => {
 
 test("unknown keys are ignored", async () => {
   put(repo, '{"port": 4404, "theme": "dark", "nested": {"a": 1}}');
-  expect(await loadConfig(repo, cwd)).toEqual({ port: 4404, adapter: undefined, source: path.join(repo, NAME) });
+  expect(await loadConfig(repo, cwd)).toStrictEqual({ port: 4404, adapter: undefined, mainAgentModel: undefined, transcriptsDir: undefined, source: path.join(repo, NAME) });
 });
 
 test("a config path that is a directory throws ConfigValueError", async () => {
@@ -106,9 +106,11 @@ test("a config path that is a directory throws ConfigValueError", async () => {
 
 test("adapter is read from the same file as port", async () => {
   put(repo, '{"port": 4405, "adapter": "some-adapter"}');
-  expect(await loadConfig(repo, cwd)).toEqual({
+  expect(await loadConfig(repo, cwd)).toStrictEqual({
     port: 4405,
     adapter: "some-adapter",
+    mainAgentModel: undefined,
+    transcriptsDir: undefined,
     source: path.join(repo, NAME),
   });
 });
@@ -135,4 +137,25 @@ test("port validation is unchanged when adapter is present", async () => {
   const error = (await loadConfig(repo, cwd).catch((e: unknown) => e)) as Error;
   expect(error).toBeInstanceOf(ConfigValueError);
   expect(error.message).toContain('"port" must be an integer between 1 and 65535');
+});
+
+test("mainAgentModel and transcriptsDir are read from the file", async () => {
+  put(repo, '{"mainAgentModel": "^claude-opus", "transcriptsDir": "/some/dir"}');
+  const config = await loadConfig(repo, cwd);
+  expect(config.mainAgentModel).toBe("^claude-opus");
+  expect(config.transcriptsDir).toBe("/some/dir");
+});
+
+test.each(["mainAgentModel", "transcriptsDir"])("%s as a number throws ConfigValueError naming it", async (name) => {
+  put(repo, `{"${name}": 5}`);
+  const error = (await loadConfig(repo, cwd).catch((e: unknown) => e)) as Error;
+  expect(error).toBeInstanceOf(ConfigValueError);
+  expect(error.message).toBe(
+    `Invalid config in ${path.join(repo, NAME)}: "${name}" must be a non-empty string, got 5`,
+  );
+});
+
+test("an invalid regex string for mainAgentModel loads without error", async () => {
+  put(repo, '{"mainAgentModel": "("}');
+  expect((await loadConfig(repo, cwd)).mainAgentModel).toBe("(");
 });

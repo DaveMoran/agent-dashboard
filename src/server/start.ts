@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import type { AgentSource } from "../agents/source.js";
 import { HOST } from "./constants.js";
 import { listenWithFallback } from "./port.js";
 import type { RepoTarget } from "./repo.js";
@@ -10,6 +11,7 @@ export type StartOptions = {
   port: number;
   webRoot?: string;
   devUi?: string;
+  agentSource?: AgentSource;
 };
 
 export type RunningServer = {
@@ -28,6 +30,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     version,
     webRoot: opts.webRoot ?? DEFAULT_WEB_ROOT,
     devUi: opts.devUi,
+    agentSource: opts.agentSource,
   });
   const { server, fellBack } = listenWithFallback(opts.port, (port) =>
     Bun.serve({ hostname: HOST, port, fetch }),
