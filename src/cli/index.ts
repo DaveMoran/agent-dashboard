@@ -1,4 +1,8 @@
 #!/usr/bin/env bun
+import * as path from "node:path";
+import { compileMainAgentPattern } from "../agents/main-agent.js";
+import { transcriptsRoot } from "../agents/transcripts/discover.js";
+import { createTranscriptSource } from "../agents/transcripts/source.js";
 import { parseCliArgs, usageText } from "../server/args.js";
 import { adapters } from "../adapters/index.js";
 import { assertKnownAdapter, createRegistry } from "../core/registry.js";
@@ -40,11 +44,28 @@ async function main(): Promise<void> {
     throw new InstanceRunningError(existing.repoPath, existing.port);
   }
 
-  const server = await startServer({
-    repo,
-    port,
-    devUi: process.env.AGENT_VISUALIZER_DEV_UI,
-  });
+  const { regex, warning } = compileMainAgentPattern(config.mainAgentModel);
+  if (warning) console.error(warning);
+  const root = transcriptsRoot(
+    config.source ? path.dirname(config.source) : undefined,
+    config.transcriptsDir,
+    process.env,
+  );
+  const source = createTranscriptSource({ root, mainAgentPattern: regex });
+  await source.start();
+
+  let server: Awaited<ReturnType<typeof startServer>>;
+  try {
+    server = await startServer({
+      repo,
+      port,
+      devUi: process.env.AGENT_VISUALIZER_DEV_UI,
+      agentSource: source,
+    });
+  } catch (error) {
+    await source.stop();
+    throw error;
+  }
   try {
     await writeInstance({
       port: server.port,
@@ -55,6 +76,7 @@ async function main(): Promise<void> {
     });
   } catch (error) {
     await server.stop();
+    await source.stop();
     throw error;
   }
 
@@ -63,6 +85,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     await server.stop();
+    await source.stop();
     removeInstance(repo.path, process.pid);
     process.exit(0);
   };
@@ -77,6 +100,7 @@ async function main(): Promise<void> {
   }
   console.log(`Agent Visualizer ${version}`);
   console.log(`Observing: ${repo.path}`);
+  console.log(`Transcripts: ${root}`);
   console.log(`Listening: ${server.url}`);
 }
 
