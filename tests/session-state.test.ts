@@ -27,7 +27,7 @@ test("initial state is standby and empty", () => {
   expect(initialSessionState()).toStrictEqual({
     sessionId: undefined, model: undefined, cwd: undefined, state: "standby",
     stateSince: undefined, lastActivity: undefined, openToolUseIds: [],
-    completedAgentIds: {}, ended: false, sawModel: false, sawStateEntry: false,
+    completedAgentIds: {}, ended: false,
   });
 });
 
@@ -38,7 +38,6 @@ test("scenario 1: last entry a prompt is working", () => {
   expect(s.stateSince).toBe(T(1));
   expect(s.sessionId).toBe("s1");
   expect(s.cwd).toBe("/r");
-  expect(s.sawStateEntry).toBe(true);
 });
 
 test("scenario 2: open tool call is working", () => {
@@ -46,7 +45,6 @@ test("scenario 2: open tool call is working", () => {
   expect(s.state).toBe("working");
   expect(s.openToolUseIds).toStrictEqual(["t1"]);
   expect(s.model).toBe("claude-opus-5-5");
-  expect(s.sawModel).toBe(true);
 });
 
 test("scenario 3: tool result is working", () => {
@@ -92,7 +90,6 @@ test("other entries update lastActivity but not state", () => {
   expect(s.stateSince).toBe(T(1));
   const only = fold([j({ type: "file-history-snapshot", timestamp: T(5) })]);
   expect(only.state).toBe("standby");
-  expect(only.sawStateEntry).toBe(false);
   expect(only.lastActivity).toBe(T(5));
 });
 
@@ -145,7 +142,6 @@ test("session-end after a prompt gives standby and ended; a later prompt resumes
   expect(s.stateSince).toBe(T(3));
   expect(s.ended).toBe(true);
   expect(s.openToolUseIds).toEqual([]);
-  expect(s.sawStateEntry).toBe(true);
   const r = applyEntry(s, (classifyLine(u(T(4))) as any).entry);
   expect(r.state).toBe("working");
   expect(r.ended).toBe(false);

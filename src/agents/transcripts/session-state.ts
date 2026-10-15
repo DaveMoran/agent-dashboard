@@ -11,8 +11,6 @@ export interface SessionStateT {
   openToolUseIds: string[];
   completedAgentIds: Record<string, string>;
   ended: boolean;
-  sawModel: boolean;
-  sawStateEntry: boolean;
 }
 
 export function initialSessionState(): SessionStateT {
@@ -26,8 +24,6 @@ export function initialSessionState(): SessionStateT {
     openToolUseIds: [],
     completedAgentIds: {},
     ended: false,
-    sawModel: false,
-    sawStateEntry: false,
   };
 }
 
@@ -49,10 +45,7 @@ export function applyEntry(state: SessionStateT, entry: TranscriptEntry): Sessio
 
   if (entry.sessionId !== undefined) next.sessionId = entry.sessionId;
   if (entry.cwd !== undefined) next.cwd = entry.cwd;
-  if (entry.model !== undefined) {
-    next.model = entry.model;
-    next.sawModel = true;
-  }
+  if (entry.model !== undefined) next.model = entry.model;
   next.lastActivity = later(state.lastActivity, entry.timestamp);
 
   if (WORKING.has(entry.kind) || STANDBY.has(entry.kind)) {
@@ -61,7 +54,6 @@ export function applyEntry(state: SessionStateT, entry: TranscriptEntry): Sessio
       next.state = target;
       next.stateSince = entry.timestamp;
     }
-    next.sawStateEntry = true;
   }
 
   if (entry.kind === "session-end") next.ended = true;

@@ -43,7 +43,7 @@ async function makeDirs() {
 
 async function setup(
   scenario: string,
-  opts: { tailWindowBytes?: number; pollIntervalMs?: number; start?: boolean } = {},
+  opts: { pollIntervalMs?: number; start?: boolean } = {},
 ): Promise<Env> {
   const dirs = await makeDirs();
   const root = await materializeTranscripts(scenario, dirs);
@@ -51,7 +51,6 @@ async function setup(
     root,
     mainAgentPattern: pattern,
     pollIntervalMs: opts.pollIntervalMs ?? 0,
-    ...(opts.tailWindowBytes !== undefined ? { tailWindowBytes: opts.tailWindowBytes } : {}),
   });
   sources.push(source);
   const events: AgentSourceEvent[] = [];
@@ -312,57 +311,19 @@ test("duplicate session ids report only the file with the latest activity", asyn
   expect(env.events.filter((e) => e.type === "session-added")).toHaveLength(0);
 });
 
-function padded(sid: string, cwd: string, body: string[]): string {
-  const pad = Array.from({ length: 50 }, (_, i) =>
-    JSON.stringify({ type: "file-history-snapshot", timestamp: T(`09:00:${String(i).padStart(2, "0")}`), pad: "x".repeat(1024) }),
-  );
-  return [...pad, ...body].join("\n") + "\n";
-}
-
-test("a small tail window gives the same session as the default window", async () => {
-  const dirs = await makeDirs();
-  const sid = id("c");
-  const body = [
-    final(sid, dirs.REPO, "10:00:00"),
-    prompt(sid, dirs.REPO, "10:00:01"),
-    JSON.stringify({ type: "assistant", timestamp: T("10:00:02"), sessionId: sid, cwd: dirs.REPO,
-      message: { id: "p", model: "claude-opus-5-5", stop_reason: "tool_use", content: [{ type: "tool_use", id: "t1", name: "Read", input: {} }] } }),
-  ];
-  const results: AgentSession[][] = [];
-  for (const window of [undefined, 4096]) {
-    const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "av-tw-")));
-    trackTempDir(root);
-    mkdirSync(path.join(root, "-p"));
-    writeFileSync(path.join(root, "-p", `${sid}.jsonl`), padded(sid, dirs.REPO, body));
-    const source = createTranscriptSource({
-      root,
-      mainAgentPattern: pattern,
-      pollIntervalMs: 0,
-      ...(window !== undefined ? { tailWindowBytes: window } : {}),
-    });
-    sources.push(source);
-    await source.start();
-    results.push(source.sessions());
-  }
-  expect(results[1]).toStrictEqual(results[0]!);
-  expect(results[1]![0]).toMatchObject({ model: "claude-opus-5-5", state: "working", lastActivity: T("10:00:02"), stateSince: T("10:00:01") });
-});
-
-test("when the window lacks the model the whole file is read", async () => {
-  const dirs = await makeDirs();
-  const sid = id("d");
-  const body = [
-    final(sid, dirs.REPO, "10:00:00"),
-    ...Array.from({ length: 6 }, (_, i) => prompt(sid, dirs.REPO, `10:01:0${i}`).replace("More", "y".repeat(900))),
-  ];
-  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "av-tw-")));
-  trackTempDir(root);
-  mkdirSync(path.join(root, "-p"));
-  writeFileSync(path.join(root, "-p", `${sid}.jsonl`), padded(sid, dirs.REPO, body));
-  const source = createTranscriptSource({ root, mainAgentPattern: pattern, pollIntervalMs: 0, tailWindowBytes: 4096 });
-  sources.push(source);
-  await source.start();
-  expect(source.sessions()[0]).toMatchObject({ model: "claude-opus-5-5", state: "working", isMain: true });
+test("a large file is folded from the start: padding after a task notification does not hide it (R5 reversed)", async () => {
+  const env = await setup("background-subagents", { start: false });
+  const parent = fileOf(env.root, `${id("4")}.jsonl`);
+  const padLine =
+    JSON.stringify({ type: "file-history-snapshot", timestamp: T("10:03:00"), pad: "x".repeat(1000) }) + "\n";
+  appendRaw(parent, padLine.repeat(3000));
+  // A model and a state-bearing entry at the very end, so a last-2-MiB window would find both and
+  // never fall back to a full read; only the notification before the padding would be missed.
+  appendLine(parent, final(id("4"), env.REPO, "10:03:01"));
+  appendLine(parent, prompt(id("4"), env.REPO, "10:03:02"));
+  expect(statSync(parent).size).toBeGreaterThan(3 * 1024 * 1024);
+  await env.source.start();
+  expect(bySession(env, id("4"))).toMatchObject({ runningSubagents: 1 });
 });
 
 test("the source never writes into the transcripts root (SC-006)", async () => {

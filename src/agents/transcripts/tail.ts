@@ -12,12 +12,6 @@ export interface TailResult {
   changed: boolean;
 }
 
-/** Index after the first `\n`, or -1 when there is none. */
-export function firstLineBoundary(bytes: Uint8Array): number {
-  const i = bytes.indexOf(10);
-  return i === -1 ? -1 : i + 1;
-}
-
 export class FileTail {
   readonly path: string;
   private offset = 0;
@@ -29,7 +23,7 @@ export class FileTail {
     this.path = path;
   }
 
-  async read(options?: { fromOffset?: number }): Promise<TailResult> {
+  async read(): Promise<TailResult> {
     let st;
     try {
       st = await stat(this.path);
@@ -46,13 +40,11 @@ export class FileTail {
       reset = true;
     }
 
-    const fromOffset = options?.fromOffset;
-    if (!reset && fromOffset === undefined && st.size === this.offset && st.mtimeMs === this.mtimeMs) {
+    if (!reset && st.size === this.offset && st.mtimeMs === this.mtimeMs) {
       return { lines: [], reset: false, bytesRead: 0, changed: false };
     }
 
-    let start = fromOffset ?? this.offset;
-    if (fromOffset !== undefined) this.pending = new Uint8Array(0);
+    let start = this.offset;
     if (start > st.size) start = st.size;
 
     let fresh: Uint8Array;

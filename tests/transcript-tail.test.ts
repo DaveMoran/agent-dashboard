@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { appendFileSync, mkdtempSync, rmSync, statSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FileTail, firstLineBoundary } from "../src/agents/transcripts/tail";
+import { FileTail } from "../src/agents/transcripts/tail";
 
 let dir: string;
 let file: string;
@@ -86,16 +86,6 @@ describe("FileTail", () => {
     await expect(tail.read()).rejects.toThrow(/^unreadable:/);
   });
 
-  test("fromOffset starts mid-file and drops pending", async () => {
-    const tail = new FileTail(file);
-    writeFileSync(file, "aa\nbb\ncc\n");
-    const r = await tail.read({ fromOffset: 3 });
-    expect(r.lines).toEqual([
-      { text: "bb", offset: 3 },
-      { text: "cc", offset: 6 },
-    ]);
-  });
-
   test("strips CR and skips empty lines", async () => {
     const tail = new FileTail(file);
     writeFileSync(file, "a\r\n\nb\n");
@@ -115,12 +105,5 @@ describe("FileTail", () => {
     await tail.read();
     expect(statSync(file).mtimeMs).toBe(before);
     expect(readFileSync(file).equals(content)).toBe(true);
-  });
-});
-
-describe("firstLineBoundary", () => {
-  test("returns index after first newline or -1", () => {
-    expect(firstLineBoundary(new TextEncoder().encode("ab\ncd"))).toBe(3);
-    expect(firstLineBoundary(new TextEncoder().encode("abcd"))).toBe(-1);
   });
 });

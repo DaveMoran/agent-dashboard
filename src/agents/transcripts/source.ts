@@ -13,12 +13,10 @@ export interface TranscriptSourceOptions {
   root: string;
   mainAgentPattern: RegExp;
   pollIntervalMs?: number;
-  tailWindowBytes?: number;
   resolveProject?: (cwd: string) => Promise<ProjectRef>;
 }
 
 const DEFAULT_POLL_MS = 500;
-const DEFAULT_WINDOW = 2 * 1024 * 1024;
 const MAX_ISSUES = 200;
 
 interface Track {
@@ -59,7 +57,6 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
   const root = options.root;
   const pattern = options.mainAgentPattern;
   const pollMs = options.pollIntervalMs ?? DEFAULT_POLL_MS;
-  const windowBytes = options.tailWindowBytes ?? DEFAULT_WINDOW;
   const resolveProject = options.resolveProject ?? createProjectResolver();
 
   const recs = new Map<string, FileRec>();
@@ -239,57 +236,10 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
     return err instanceof Error ? err.message : String(err);
   }
 
-  async function firstReadWindowed(
-    rec: FileRec,
-    track: Track,
-    isSub: boolean,
-    size: number,
-    silent: boolean,
-  ): Promise<void> {
-    const fromOffset = size - windowBytes;
-    const sink: IngestIssue[] = [];
-    const savedState = rec.combinedState;
-    const savedSince = rec.combinedSince;
-
-    const tail = new FileTail(track.tail.path);
-    const before = await Bun.file(track.tail.path).slice(fromOffset - 1, fromOffset).bytes();
-    const r = await tail.read({ fromOffset });
-    // The window usually starts mid-line. Unless the byte before it is a newline, the line
-    // beginning exactly at fromOffset is partial and is dropped.
-    const lines =
-      before[0] !== 10 && r.lines[0] !== undefined && r.lines[0].offset === fromOffset
-        ? r.lines.slice(1)
-        : r.lines;
-    track.tail = tail;
-    await rebuild(rec, track, lines, sink);
-    const ok = isSub ? track.state.sawStateEntry : track.state.sawModel && track.state.sawStateEntry;
-
-    if (!ok) {
-      sink.length = 0;
-      rec.combinedState = savedState;
-      rec.combinedSince = savedSince;
-      const full = new FileTail(track.tail.path);
-      const all = await full.read();
-      track.tail = full;
-      await rebuild(rec, track, all.lines, sink);
-    }
-    for (const issue of sink) addIssue(issue);
-    if (!silent) await report(rec, track.state.lastActivity);
-  }
-
   async function readTrack(rec: FileRec, track: Track, isSub: boolean, silent: boolean): Promise<void> {
     const file = track.tail.path;
     const sink: IngestIssue[] = [];
     try {
-      if (!track.read) {
-        const size = (await stat(file)).size;
-        if (size > windowBytes) {
-          await firstReadWindowed(rec, track, isSub, size, silent);
-          track.read = true;
-          track.failing = false;
-          return;
-        }
-      }
       const r = await track.tail.read();
       track.read = true;
       track.failing = false;
