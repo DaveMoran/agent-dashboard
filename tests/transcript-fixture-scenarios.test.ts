@@ -146,3 +146,18 @@ test("timestamps strictly increase within every fixture file", () => {
     }
   }
 });
+
+test("live-shapes: a queued notification closes one agent; continued-in ends a session", () => {
+  const s = load("live-shapes");
+  const a = s.sessions[id("a")]!;
+  expect(a.issues).toEqual([]);
+  expect(a.state.state).toBe("working");
+  expect(Object.keys(a.state.completedAgentIds)).toEqual(["a1111111111111111"]);
+  expect(running(s, id("a"))).toEqual(["a2222222222222222"]);
+  const b = s.sessions[id("b")]!;
+  expect(b.issues).toEqual([]);
+  expect(b.state.state).toBe("standby");
+  expect(b.state.ended).toBe(true);
+  expect(running(s, id("b"))).toEqual([]);
+  expect(combineState(b.state.state, 0)).toBe("standby");
+});

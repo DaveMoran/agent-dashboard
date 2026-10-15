@@ -74,7 +74,7 @@ Every non-zero exit prints a message to stderr naming the specific problem. For 
 
 #### `GET /api/sessions`
 
-Returns the Claude Code projects found in the transcripts and their main-agent sessions. Types are in `src/contract/sessions.ts`. Projects and sessions are sorted by `lastActivity`, newest first (ties by id). Without a transcript source the body is `{ "projects": [] }`.
+Returns the Claude Code projects found in the transcripts and their main-agent sessions. Types are in `src/contract/sessions.ts`. Projects and sessions are sorted by `lastActivity`, newest first (ties by id). Without a transcript source the body is `{ "projects": [] }`. A subagent task notification, whether a user message or a queued `attachment` line, closes that subagent, and a `continued-in` line ends its session (standby, no running subagents).
 
 ```json
 {

@@ -59,7 +59,7 @@ git log / branches ──► Git ingester + attribution ────────
 - *OpenSpec:* `openspec/changes/<id>/` (proposal.md, tasks.md); moved to archive → done.
 - *BMAD:* story files' `Status:` field (+ sprint status file if present); epics → grouping.
 
-**Transcript source:** polls every 500 ms (no file watching) and tails every session JSONL under `~/.claude/projects/`, including subagent transcripts; a subagent counts as running until it ends its turn or the main session records its task notification, and one that dies with neither stays running until 006's idle timeout; groups sessions into projects; records prompts, tool calls (Edit/Write → file-edit, Bash → bash/test-run), model, `cwd`, `gitBranch`, timestamps.
+**Transcript source:** polls every 500 ms (no file watching) and tails every session JSONL under `~/.claude/projects/`, including subagent transcripts; a subagent counts as running until it ends its turn or the main session records its task notification, and one that dies with neither stays running until 006's idle timeout; queued notification lines close subagents too, and a `continued-in` line ends a session; groups sessions into projects; records prompts, tool calls (Edit/Write → file-edit, Bash → bash/test-run), model, `cwd`, `gitBranch`, timestamps.
 
 **Attribution order:** git branch on transcript entry → spec ID mentioned in prompt/commit → edited files ∈ spec's artifact/likely-files → time window between status transitions.
 

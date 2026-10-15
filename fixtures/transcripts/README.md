@@ -29,3 +29,4 @@ All text was replaced with neutral strings; no real conversation content is kept
 - `non-main`: two sessions in a plain dir on the sonnet model (one switched from opus); never main.
 - `two-worktrees`: one session in the repo (working, last activity 10:05) and one in a worktree (standby, 10:02).
 - `malformed`: invalid JSON, a non-object, an assistant line without timestamp, then a valid turn and a partial last line.
+- `live-shapes`: shapes from a live check. Session a: two async agents, an open `Bash` call, then a queued `attachment` notification closes agent 1 (its file ends in a tool result); working, one running subagent. Session b: a prompt without reply, then a `continued-in` line; standby, no running subagents.

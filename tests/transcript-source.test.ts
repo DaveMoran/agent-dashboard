@@ -443,3 +443,9 @@ test("live polling delivers a state change within 1000 ms (SC-002)", async () =>
   clearTimeout(timeout!);
   expect(winner).toBe("event");
 });
+
+test("live-shapes: queued notification closes a subagent, continued-in ends a session", async () => {
+  const env = await setup("live-shapes");
+  expect(bySession(env, id("a"))).toMatchObject({ state: "working", runningSubagents: 1, isMain: true });
+  expect(bySession(env, id("b"))).toMatchObject({ state: "standby", runningSubagents: 0, isMain: true });
+});
