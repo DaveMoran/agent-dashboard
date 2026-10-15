@@ -56,3 +56,62 @@ test("ties on lastActivity sort by id ascending", () => {
   expect(res.projects.map((p) => p.id)).toEqual(["/p1", "/p2"]);
   expect(res.projects[0]!.sessions.map((s) => s.sessionId)).toEqual(["s1", "s9"]);
 });
+
+// Part 2: the route
+import { createHandler } from "../src/server/routes";
+import { createStubAgentSource } from "./stub-agent-source";
+
+function handler(source?: ReturnType<typeof createStubAgentSource>) {
+  return createHandler({
+    repo: { path: "/r", name: "r" },
+    version: "0.0.0",
+    webRoot: "/nonexistent",
+    agentSource: source,
+  });
+}
+const get = (h: ReturnType<typeof handler>) => h(new Request("http://x/api/sessions"));
+
+const twoProjects = () => [
+  makeSession({ sessionId: "a1", projectId: "/a/.git", projectName: "a", cwd: "/a", lastActivity: T("10:00:00") }),
+  makeSession({ sessionId: "b1", projectId: "/b/.git", projectName: "b", cwd: "/b", lastActivity: T("10:05:00") }),
+];
+
+test("GET /api/sessions returns the built response as JSON", async () => {
+  const res = await get(handler(createStubAgentSource(twoProjects())));
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-type")).toContain("application/json");
+  expect(await res.json()).toStrictEqual(buildSessionsResponse(twoProjects()));
+  const body = (await (await get(handler(createStubAgentSource(twoProjects())))).json()) as {
+    projects: { id: string }[];
+  };
+  expect(body.projects.map((p) => p.id)).toEqual(["/b/.git", "/a/.git"]);
+});
+
+test("the next request reflects changed sessions", async () => {
+  const source = createStubAgentSource(twoProjects());
+  const h = handler(source);
+  const first = (await (await get(h)).json()) as { projects: { sessions: { state: string }[] }[] };
+  expect(first.projects[0]!.sessions[0]!.state).toBe("standby");
+  source.setSessions([
+    makeSession({ sessionId: "b1", projectId: "/b/.git", projectName: "b", cwd: "/b", state: "working", lastActivity: T("10:06:00") }),
+  ]);
+  const second = (await (await get(h)).json()) as {
+    projects: { sessions: { state: string }[] }[];
+  };
+  expect(second.projects).toHaveLength(1);
+  expect(second.projects[0]!.sessions[0]!.state).toBe("working");
+});
+
+test("POST /api/sessions is 405 with Allow: GET", async () => {
+  const res = await handler(createStubAgentSource([]))(
+    new Request("http://x/api/sessions", { method: "POST" }),
+  );
+  expect(res.status).toBe(405);
+  expect(res.headers.get("allow")).toBe("GET");
+});
+
+test("a handler without a source returns no projects", async () => {
+  const res = await get(handler());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toStrictEqual({ projects: [] });
+});

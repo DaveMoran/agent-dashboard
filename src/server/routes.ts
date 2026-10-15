@@ -1,12 +1,15 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
+import type { AgentSource } from "../agents/source.js";
 import type { RepoTarget } from "./repo.js";
+import { buildSessionsResponse } from "./sessions.js";
 
 export type HandlerOptions = {
   repo: RepoTarget;
   version: string;
   webRoot: string;
   devUi?: string;
+  agentSource?: AgentSource;
 };
 
 const UI_NOT_BUILT = "UI not built. Run `bun run build`.";
@@ -110,6 +113,13 @@ export function createHandler(opts: HandlerOptions): (req: Request) => Promise<R
         repoName: opts.repo.name,
         version: opts.version,
       });
+    }
+
+    if (url.pathname === "/api/sessions") {
+      if (req.method !== "GET") {
+        return new Response(null, { status: 405, headers: { Allow: "GET" } });
+      }
+      return Response.json(buildSessionsResponse(opts.agentSource?.sessions() ?? []));
     }
 
     if (url.pathname.startsWith("/api/")) {
