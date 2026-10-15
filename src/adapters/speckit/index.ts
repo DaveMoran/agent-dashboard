@@ -5,7 +5,7 @@ import type { Spec } from "../../core/model";
 import { currentBranch } from "../../git/worktrees";
 import { pickAuthoritative } from "./authority";
 import { groupFeatureFiles, parseFeatureDirName, type FeatureCopy } from "./feature-dir";
-import { isMergedIntoMain } from "./merged";
+import { mergedMainTasks } from "./merged";
 import { deriveStatus } from "./status";
 import { parseTasks } from "./tasks";
 import { parseTitle } from "./title";
@@ -79,9 +79,11 @@ export const speckitAdapter: Adapter = {
       const dir = `specs/${copy.dirName}`;
       const specMd = await Bun.file(path.join(copy.root, dir, "spec.md")).text();
       const hasTasks = copy.files.includes(`${dir}/tasks.md`);
-      const tasks = hasTasks
+      const copyTasks = hasTasks
         ? parseTasks(await Bun.file(path.join(copy.root, dir, "tasks.md")).text())
         : [];
+      const mainTasks = await mergedMainTasks(copy.root, copy.dirName);
+      const tasks = mainTasks ?? copyTasks;
       const title = parseTitle(specMd);
       const branch = rootBranches.get(copy.root) ?? null;
       const spec: RawSpec = {
@@ -91,7 +93,7 @@ export const speckitAdapter: Adapter = {
           hasPlan: copy.files.includes(`${dir}/plan.md`),
           hasTasks,
           tasks,
-          merged: await isMergedIntoMain(copy.root, copy.dirName),
+          merged: mainTasks !== null,
         }),
         dependsOn: [],
         tasks,

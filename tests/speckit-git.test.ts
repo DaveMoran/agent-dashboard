@@ -6,7 +6,7 @@ import type { Snapshot } from "../src/core/model";
 import { scan } from "../src/core/scan";
 import { runGit } from "../src/git/run";
 import { resolveRoots } from "../src/git/worktrees";
-import { commitAll, git, makeGitRepo } from "./git-helpers";
+import { addWorktree, commitAll, git, makeGitRepo } from "./git-helpers";
 import { cleanupFixtures, copyFixture } from "./helpers";
 
 afterEach(cleanupFixtures);
@@ -101,5 +101,22 @@ describe("speckit merged rule", () => {
     const snap = await scanRepo(await copyFixture("speckit/repo"));
     expect(statusOf(snap, "005")).toBe("review");
     expect(snap.specs.some((s) => s.status === "done")).toBe(false);
+  });
+
+  test("a merged feature takes its tasks from main, not from a stale copy", async () => {
+    const repo = await makeGitRepo("speckit/repo");
+    const c = await addWorktree(repo, { detach: true });
+    await writeFile(
+      path.join(c, "specs/005-review/tasks.md"),
+      "- [ ] T001 One\n- [ ] T002 Two\n- [ ] T003 Three\n",
+    );
+    const spec = (await scanRepo(c)).specs.find((s) => s.id === "005");
+    expect(spec?.status).toBe("done");
+    expect(spec?.source).toStrictEqual({ root: c });
+    expect(spec?.tasks).toStrictEqual([
+      { id: "T001", text: "One", done: true },
+      { id: "T002", text: "Two", done: true },
+      { id: "T003", text: "Three", done: true },
+    ]);
   });
 });
