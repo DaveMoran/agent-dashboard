@@ -175,7 +175,7 @@ description: "Task list for 004-session-ingester"
 - Phases 4–6: T009, T010, T011, T012, T013 touch different files and can run together after Phase 3.
 - Phase 8: T017 can start as soon as Phase 2 is done, in parallel with Phases 3–7.
 
-Only run parallel subagents in separate worktrees (they share `tasks.md`); in one checkout, run tasks one after another.
+Parallel batches follow the "Parallel tasks" rules in `CLAUDE.md` (same checkout, parallel coders do not commit; the planner verifies once and commits each task in ID order). Batches for this feature: T002 + T003 + T005; T009 + T010; T012 + T013. Everything else runs one task at a time.
 
 ## Implementation Strategy
 
