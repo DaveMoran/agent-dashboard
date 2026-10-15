@@ -1,4 +1,5 @@
 import type { Adapter } from "../core/adapter";
+import { speckitAdapter } from "./speckit";
 
-// Feature 003 adds the first adapter.
-export const adapters: Adapter[] = [];
+// Registration order breaks detection ties.
+export const adapters: Adapter[] = [speckitAdapter];

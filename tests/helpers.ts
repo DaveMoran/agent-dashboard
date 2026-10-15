@@ -21,3 +21,8 @@ export async function cleanupFixtures(): Promise<void> {
     await rm(dir, { recursive: true, force: true });
   }
 }
+
+/** Register a directory for removal by cleanupFixtures(). */
+export function trackTempDir(dir: string): void {
+  created.push(dir);
+}

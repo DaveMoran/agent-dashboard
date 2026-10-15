@@ -79,3 +79,32 @@ By default the first matching adapter wins. To force one, set `adapter` in `agen
 ## Testing an adapter
 
 Use fixtures, never the real repo. [`fixtures/stub/`](../fixtures/stub/) is the worked example: `fixtures/stub/adapter.ts` is a tiny JSON-file adapter, `repo-a` and `repo-b` hold valid specs, and `invalid` holds one file per validation problem. Tests that change files must work on a copy in a temp directory (see `tests/helpers.ts`), never on the fixture itself. Run an adapter through `scan(adapter, { roots })` from `src/core/scan.ts` and assert exact specs and issues, as `tests/scan.test.ts` and `tests/validate.test.ts` do.
+
+## The Spec Kit adapter
+
+`speckit` (`src/adapters/speckit/`) is the first adapter and a second worked example next to `fixtures/stub/`. Its fixtures are in [`fixtures/speckit/`](../fixtures/speckit/).
+
+**Detection.** A root matches when it has a `.specify/` folder, or a `specs/NNN-name/spec.md` file (`NNN` is three or more digits). It watches `specs/*/**` in every root.
+
+**Fields.** Each `specs/NNN-name/` folder that has a `spec.md` becomes one spec. `id` is the digits as written, `title` is the first `# ` heading of `spec.md` without a leading `Feature Specification:` (no heading gives a `missing-title` issue and the id as title), `branch` is the folder name, and `artifacts` lists every file in the folder (paths relative to the root, sorted). Folders without `spec.md` and folders whose names do not start with three digits are ignored.
+
+**Task lines.** A task is a line like `- [x] T012 [P] [US1] Text`: a `-` or `*` bullet (indent allowed), a checkbox (`x` or `X` is done), an id `T` plus digits, then optional bracket tokens and the text. `[P]` sets `parallel` and is dropped from the text; other tokens such as `[US1]` stay in the text. A heading `## Phase ...` sets the `phase` of the tasks below it. Lines inside fenced code blocks (``` or `~~~`) are ignored, as is everything else.
+
+**Status.**
+
+| Condition (first match wins) | Status |
+|---|---|
+| `tasks.md` on local `main` has at least one task and all are ticked | `done` |
+| `tasks.md` has tasks and all are ticked | `review` |
+| `tasks.md` has at least one ticked task | `in-progress` |
+| `tasks.md` exists | `ready` |
+| `plan.md` exists | `planned` |
+| otherwise | `drafted` |
+
+**The merged rule.** `done` means local `main` holds a fully ticked `tasks.md` for the feature. This covers merge commits, squash merges and deleted branches, and a freshly created branch is not `done`. After merging on GitHub, pull `main` locally so the adapter can see it. Without a `main` branch, or outside git, nothing is `done`.
+
+**Worktrees.** `resolveRoots(repoPath)` (`src/git/worktrees.ts`) returns the path you gave first, then the repo's other worktrees; a worktree whose folder is gone stays in the list and is reported as `unreadable-path`. When a feature exists in several roots, the copy in the root that has the feature's branch checked out wins; otherwise the first root with a copy wins. `source` records that root and its checked-out branch (the branch is left out when detached).
+
+**Read-only git.** All git access is in `src/git/` and goes through `runGit`, which runs `git -C <dir>` with `GIT_OPTIONAL_LOCKS=0`. Only `rev-parse`, `worktree list --porcelain`, `symbolic-ref` and `show` are used. Without git the adapter still works from files alone.
+
+**Live check.** `bun run live-check [repo-path]` scans a real repo (default: this one) and prints its roots, specs and issues. It is on demand and not part of `bun test`.

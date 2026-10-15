@@ -362,7 +362,7 @@ test("unknown adapter in config exits 1 and starts no server", async () => {
   const { code, stdout, stderr } = await run([repoDir, "--port", String(await freePort())]);
   expect(code).toBe(1);
   expect(stdout).toBe("");
-  expect(stderr).toContain('Unknown adapter "nope". Available adapters: none registered');
+  expect(stderr).toContain('Unknown adapter "nope". Available adapters: speckit');
   expect(fs.existsSync(path.join(stateDir, "instances"))).toBe(false);
 });
 

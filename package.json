@@ -13,7 +13,8 @@
     "dev": "bun scripts/dev.ts",
     "build": "vite build",
     "test": "bun test",
-    "verify": "tsc --noEmit && bun test"
+    "verify": "tsc --noEmit && bun test",
+    "live-check": "bun scripts/live-check.ts"
   },
   "dependencies": {
     "react": "^18.2.0",
