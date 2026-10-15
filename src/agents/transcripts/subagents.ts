@@ -2,7 +2,7 @@ import type { SessionState } from "../../contract/sessions";
 import type { SessionStateT } from "./session-state";
 
 export function isSubagentRunning(agentId: string, sub: SessionStateT, parent: SessionStateT): boolean {
-  if (sub.state !== "working") return false;
+  if (parent.ended || sub.state !== "working") return false;
   const notified = parent.completedAgentIds[agentId];
   if (notified === undefined) return true;
   if (sub.lastActivity === undefined) return false;

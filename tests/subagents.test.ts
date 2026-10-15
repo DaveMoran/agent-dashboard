@@ -69,3 +69,8 @@ test("scenario 6 in memory", () => {
   expect(running()).toBe(0);
   expect(combineState(parent.state, running())).toBe("standby");
 });
+
+test("a working subagent of an ended parent is not running", () => {
+  const ended = fold([u(T(1)), j({ type: "continued-in", timestamp: T(2) })]);
+  expect(isSubagentRunning("a", fold([u(T(1)), call(T(2), "x")]), ended)).toBe(false);
+});

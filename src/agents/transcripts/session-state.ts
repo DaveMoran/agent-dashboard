@@ -10,6 +10,7 @@ export interface SessionStateT {
   lastActivity: string | undefined;
   openToolUseIds: string[];
   completedAgentIds: Record<string, string>;
+  ended: boolean;
   sawModel: boolean;
   sawStateEntry: boolean;
 }
@@ -24,13 +25,14 @@ export function initialSessionState(): SessionStateT {
     lastActivity: undefined,
     openToolUseIds: [],
     completedAgentIds: {},
+    ended: false,
     sawModel: false,
     sawStateEntry: false,
   };
 }
 
 const WORKING: ReadonlySet<EntryKind> = new Set(["prompt", "tool-call", "tool-result", "progress"]);
-const STANDBY: ReadonlySet<EntryKind> = new Set(["final", "turn-end", "interrupt"]);
+const STANDBY: ReadonlySet<EntryKind> = new Set(["final", "turn-end", "interrupt", "session-end"]);
 
 function later(a: string | undefined, b: string | undefined): string | undefined {
   if (b === undefined) return a;
@@ -61,6 +63,9 @@ export function applyEntry(state: SessionStateT, entry: TranscriptEntry): Sessio
     }
     next.sawStateEntry = true;
   }
+
+  if (entry.kind === "session-end") next.ended = true;
+  else if (WORKING.has(entry.kind)) next.ended = false;
 
   if (entry.kind === "tool-call") {
     for (const id of entry.toolUseIds) {

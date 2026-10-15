@@ -27,7 +27,7 @@ test("initial state is standby and empty", () => {
   expect(initialSessionState()).toStrictEqual({
     sessionId: undefined, model: undefined, cwd: undefined, state: "standby",
     stateSince: undefined, lastActivity: undefined, openToolUseIds: [],
-    completedAgentIds: {}, sawModel: false, sawStateEntry: false,
+    completedAgentIds: {}, ended: false, sawModel: false, sawStateEntry: false,
   });
 });
 
@@ -133,4 +133,27 @@ test("applyEntry does not mutate its input", () => {
     expect(out).not.toBe(frozen);
   }
   expect(JSON.stringify(frozen)).toBe(before);
+});
+
+const sessionEnd = (t: string) => j({ type: "continued-in", timestamp: t, sessionId: "s1", continuedInSessionId: "s2" });
+const queuedNote = (t: string, id: string) =>
+  j({ type: "attachment", timestamp: t, sessionId: "s1", attachment: { type: "queued_command", prompt: `<task-notification>\n<task-id>${id}</task-id>\n<status>completed</status>\n</task-notification>` } });
+
+test("session-end after a prompt gives standby and ended; a later prompt resumes", () => {
+  const s = fold([u(T(1)), call(T(2), "x"), sessionEnd(T(3))]);
+  expect(s.state).toBe("standby");
+  expect(s.stateSince).toBe(T(3));
+  expect(s.ended).toBe(true);
+  expect(s.openToolUseIds).toEqual([]);
+  expect(s.sawStateEntry).toBe(true);
+  const r = applyEntry(s, (classifyLine(u(T(4))) as any).entry);
+  expect(r.state).toBe("working");
+  expect(r.ended).toBe(false);
+});
+
+test("a queued notification records the agent id without changing state", () => {
+  const s = fold([u(T(1)), queuedNote(T(2), "a1")]);
+  expect(s.state).toBe("working");
+  expect(s.stateSince).toBe(T(1));
+  expect(s.completedAgentIds).toEqual({ a1: T(2) });
 });
