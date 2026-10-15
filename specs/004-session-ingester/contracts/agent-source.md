@@ -29,6 +29,7 @@ export interface AgentSource {
 6. After `stop()` resolves, no listener receives anything and no timer or handle stays open (a test can `start()`/`stop()` and the process exits).
 7. A listener that throws does not stop other listeners or the source; the error is recorded nowhere else (listeners own their errors).
 8. Sessions reported by one source never share a `sessionId` (duplicates resolved as in research R8).
+9. A change in a session's running-subagent count that does not change its `state` emits `session-updated`, not `state-changed`.
 
 ## Transcript source factory
 

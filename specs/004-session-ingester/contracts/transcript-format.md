@@ -17,6 +17,7 @@ Common fields copied onto every entry when they are strings: `timestamp`, `sessi
 6. `message.content` is an array containing at least one block with `type: "tool_result"` → `tool-result`, `toolUseIds` = those blocks' `tool_use_id` strings.
 7. Let `text` be `message.content` if it is a string, else the `text` of the first block with `type: "text"`, else `""`.
    - `text` starts with `[Request interrupted by user` → `interrupt`.
+   - `text` starts with `<task-notification>` → `prompt`, and `completedAgentIds` = the contents of every `<task-id>…</task-id>` in `text` that is followed (anywhere in `text`) by a `<status>…</status>` element. (A notification starts a new turn of the main agent, and tells us the named subagents are done.)
    - `text` starts with any of `<command-name>`, `<local-command-`, `<bash-input>`, `<bash-stdout>`, `<bash-stderr>` → `other`.
 8. `message.content` is a non-empty string, or an array with at least one `text` or `image` block → `prompt`.
 9. Otherwise → `other`.
@@ -51,6 +52,9 @@ Common fields copied onto every entry when they are strings: `timestamp`, `sessi
 {"type":"user","timestamp":"2026-10-15T10:06:00.000Z","sessionId":"s1","cwd":"{{REPO}}","isMeta":true,"message":{"role":"user","content":"<local-command-caveat>…"}}
 {"type":"user","timestamp":"2026-10-15T10:06:00.100Z","sessionId":"s1","cwd":"{{REPO}}","message":{"role":"user","content":"<command-name>/model</command-name>"}}
 {"type":"file-history-snapshot","timestamp":"2026-10-15T10:06:01.000Z"}
+{"type":"user","timestamp":"2026-10-15T10:07:00.000Z","sessionId":"s1","cwd":"{{REPO}}","message":{"role":"user","content":"<task-notification>\n<task-id>a0b1c2d3e4f5a6b7c</task-id>\n<tool-use-id>tu9</tool-use-id>\n<status>completed</status>\n</task-notification>"}}
 ```
 
-Expected kinds, in order: `prompt`, `progress`, `tool-call` (`tu1`), `tool-result` (`tu1`), `final`, `turn-end`, `interrupt`, `other`, `other`, `other`.
+Expected kinds, in order: `prompt`, `progress`, `tool-call` (`tu1`), `tool-result` (`tu1`), `final`, `turn-end`, `interrupt`, `other`, `other`, `other`, `prompt` (`completedAgentIds: ["a0b1c2d3e4f5a6b7c"]`).
+
+Subagent transcript lines use the same shapes (plus `"isSidechain":true`, `"agentId"`) and are classified by the same function.

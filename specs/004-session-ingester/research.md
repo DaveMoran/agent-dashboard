@@ -4,11 +4,11 @@ All findings about the transcript format come from inspecting the structure (ent
 
 ## R1. Where transcripts live, and which files are sessions
 
-**Decision**: A session is a file matching `<root>/<project-folder>/<name>.jsonl`, exactly two levels below the root. Everything deeper is ignored, in particular `<root>/<project-folder>/<session-uuid>/subagents/agent-*.jsonl` (subagent transcripts, with sibling `.meta.json` files) and other per-session folders (`tool-results/`, error files).
+**Decision**: A session is a file matching `<root>/<project-folder>/<name>.jsonl`, exactly two levels below the root. Its subagents are the files matching `<root>/<project-folder>/<name>/subagents/agent-<agentId>.jsonl` (sibling `.meta.json` files are not read in V1). Everything else deeper is ignored (`tool-results/`, error files).
 
 **Rationale**: Subagent transcripts carry the *parent's* `sessionId` and `isSidechain: true`; counting them would create phantom sessions or collide with the parent (FR-002, US3 scenario 5). The project folder name is a lossy encoding of the cwd (`/` → `-`), so it is not used for grouping; the `cwd` field on entries is.
 
-**Alternatives considered**: reading subagent transcripts to mark subagent activity: deferred to the project view (later), not needed for V1 state.
+**Alternatives considered**: ignoring subagent transcripts and relying on the parent's open tool call: wrong for background subagents, which are the common case here (see R12).
 
 ## R2. Line shapes and the fields we keep
 
@@ -24,6 +24,8 @@ Observed facts the rules rely on:
 - Local slash commands (`/model`, `/clear`, ...) write user entries whose string content starts with `<local-command-caveat>` (with `isMeta: true`), `<command-name>` or `<local-command-stdout>`; they do not start a turn. Skill invocations start with `<command-message>` and do start a turn, followed by an `isMeta` user entry with the skill body. `!` shell commands write `<bash-input>` / `<bash-stdout>` / `<bash-stderr>` entries and do not start a turn.
 - Tool results are user entries whose content array contains `tool_result` blocks (sometimes plus `text`).
 - Bookkeeping lines can be several MB (`api-request-blob`).
+- A background subagent's completion reaches the parent as a user entry (not `isMeta`) whose text starts with `<task-notification>` and contains `<task-id>{agentId}</task-id>` and `<status>{status}</status>` (`completed` seen; other values such as `failed` or `killed` are treated the same). It also starts a new turn of the main agent, so it is a `prompt`.
+- Subagent transcripts use the same entry shapes, with `isSidechain: true` and the parent's `sessionId`; they end with an `end_turn` assistant block and no `turn_duration` line.
 
 **Rationale**: FR-004 asks for the minimum; nothing that holds conversation text is retained.
 
@@ -39,7 +41,7 @@ Open tool-call IDs are also tracked (added on `tool-call`, removed on `tool-resu
 
 **Alternatives considered**: deriving state only from open tool calls plus `end_turn`: fails on interrupted streams. Using `turn_duration` alone: undocumented and absent on interrupt.
 
-**Known limitation (recorded for the user)**: a subagent launched **in the background** returns its tool result immediately, so the main turn can end (`standby`) while the subagent still works; its completion arrives later as a new user entry (a task notification), which starts a new `working` turn. Transcript-only state cannot show "standby but a background subagent is running" without reading subagent transcripts. Foreground subagents, the setup used for `/speckit-implement`, are handled correctly. Revisit with the project view (which reads subagent transcripts) or 005.
+This rule gives the session's **own turn state**. The session's reported state also accounts for subagents (R12).
 
 ## R4. Incremental tailing
 
@@ -96,3 +98,15 @@ Open tool-call IDs are also tracked (added on `tool-call`, removed on `tool-resu
 **Decision**: Hand-trimmed JSONL built from the real shapes in R2, one folder per scenario under `fixtures/transcripts/`, laid out like the real root. Working directories use placeholders (`{{REPO}}`, `{{WORKTREE}}`, `{{PLAIN}}`, `{{MISSING}}`) that a test helper replaces after creating temp git repos and copying the scenario into a temp root. All user and assistant text is replaced with short neutral strings; bookkeeping lines keep only their `type` and `timestamp` plus a padding field where size matters.
 
 **Rationale**: Project grouping needs real git repos; temp copies also guarantee tests never append to checked-in files. Trimming satisfies FR-015.
+
+## R12. Subagents keep their main session working
+
+**Decision**: Each subagent transcript gets its own `FileTail` and is folded with the same reducer (R3), giving the subagent's own state. The parent's reducer additionally records `completedAgentIds` from task notifications (R2). A subagent is **running** when its own state is `working` and its ID is not in the parent's `completedAgentIds`, or when it has an entry newer than the notification (a resumed subagent). The session's reported state is `working` if its own turn state is `working` or `runningSubagents > 0`, else `standby`. Last activity is the max over the session file and its subagent files. Subagent models are not used for the main-agent rule.
+
+Discovery: in each pass, for every session whose file has a timestamped entry, `readdir` `<session-stem>/subagents/` if it exists, and tail each `agent-*.jsonl` like a session file (stat-only when unchanged). A subagent file seen before its parent has a timestamped entry is skipped until it has one.
+
+**Rationale**: Every recent subagent on this machine was launched in the background (`toolUseResult.status: "async_launched"`), so the parent's open tool call is closed immediately and its own turn often ends while subagents work. Reading subagent transcripts is the only transcript-based signal; the notification closes subagents that stop without a final reply. Foreground subagents are covered by both the open tool call and the subagent's own transcript.
+
+**Alternatives considered**: reading `.meta.json` (agent type, description, `toolUseId`): not needed for V1 counts; useful for the later per-subagent partitions. Matching subagents to parent tool calls via the `async_launched` result's `agentId`: adds nothing for V1 since the file location already gives the parent.
+
+**Remaining limitation**: a subagent that dies with neither a final reply nor a notification keeps its parent `working`; 006's idle timeout bounds this through last activity.

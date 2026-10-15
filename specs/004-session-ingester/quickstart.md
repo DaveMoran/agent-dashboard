@@ -15,6 +15,7 @@ Expected: type check passes; the new test files listed in [plan.md](./plan.md) p
 
 - `tests/session-state.test.ts` covers every acceptance scenario of spec US1 (prompt, tool call, tool result, final reply, subagent turn, interruption, one event per change).
 - `tests/transcript-source.test.ts` runs every scenario under `fixtures/transcripts/` and checks the fixture files are byte-identical with unchanged mtimes afterwards (SC-006).
+- `tests/subagents.test.ts` and the background-subagents fixture: the session stays `working` after the main turn ends until every subagent is done.
 - `tests/transcript-project.test.ts` creates a temp repo with two worktrees and gets one project (SC-004).
 
 ## 2. Against fixtures through the real server
@@ -38,6 +39,6 @@ bun run dev -- .
 curl -s http://127.0.0.1:<port>/api/sessions
 ```
 
-With this Claude Code session open on an Opus model, this repo appears as one project (worktrees included) with this session in it: `working` while a turn runs (including while a foreground subagent runs), `standby` after the reply. A Sonnet-only session in another repo does not appear. Setting `"mainAgentModel": "^claude-sonnet"` in `agent-visualizer.config.json` flips that. Setting it to `"("` prints a warning naming `mainAgentModel` at startup and uses the default.
+With this Claude Code session open on an Opus model, this repo appears as one project (worktrees included) with this session in it: `working` while a turn runs, and still `working` with `runningSubagents > 0` while background subagents run after the main reply; `standby` once the last subagent finishes and the main agent's turn has ended. A Sonnet-only session in another repo does not appear. Setting `"mainAgentModel": "^claude-sonnet"` in `agent-visualizer.config.json` flips that. Setting it to `"("` prints a warning naming `mainAgentModel` at startup and uses the default.
 
 Nothing under `~/.claude/projects` is modified (compare `ls -l` before and after, or watch mtimes of session files you are not using).

@@ -14,6 +14,7 @@ The only thing kept from a JSONL line. Produced by `classifyLine(line)`; rules i
 | `cwd` | `string \| undefined` | |
 | `model` | `string \| undefined` | Assistant entries only; never `<synthetic>`. |
 | `toolUseIds` | `string[]` | `tool-call`: ids opened. `tool-result`: ids answered. Otherwise empty. |
+| `completedAgentIds` | `string[]` | `prompt` from a task notification: subagent IDs reported done. Otherwise empty. |
 
 `classifyLine` returns either `{ entry: TranscriptEntry }` or `{ issue: { reason: "invalid-json" | "not-an-object" | "missing-field", field?: string } }`. The caller adds file and byte position to make an `IngestIssue`.
 
@@ -30,6 +31,7 @@ Per-file reducer state. Pure: `applyEntry(state, entry) -> SessionState` returns
 | `stateSince` | `string \| undefined` | `undefined` | timestamp of the entry that last changed `state` |
 | `lastActivity` | `string \| undefined` | `undefined` | max of entry timestamps |
 | `openToolUseIds` | `string[]` | `[]` | add on `tool-call`, remove on `tool-result`, clear on `final`/`turn-end`/`interrupt` |
+| `completedAgentIds` | `Record<string, string>` | `{}` | agent ID → timestamp of the notification entry that reported it done |
 | `sawModel` | `boolean` | `false` | true once an entry with `model` is applied (tail-window check) |
 | `sawStateEntry` | `boolean` | `false` | true once a state-bearing entry is applied (tail-window check) |
 
@@ -46,6 +48,22 @@ Per-file reducer state. Pure: `applyEntry(state, entry) -> SessionState` returns
 
 Applying a working kind while already `working` (or a standby kind while `standby`) does not change `state` or `stateSince`.
 
+The same reducer runs on each subagent file; `state` there is the subagent's own state.
+
+## SubagentTrack (`src/agents/transcripts/source.ts`, internal)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `agentId` | `string` | from file name `agent-<agentId>.jsonl` |
+| `tail` | `TailState` | |
+| `state` | `SessionState` reducer state | |
+
+**Running** (research R12): `state.state === "working"` and (`agentId` not in parent `completedAgentIds`, or subagent `lastActivity` > the notification timestamp).
+
+## Combined session state
+
+`turnState` = the session file's reducer `state`. `runningSubagents` = count of running subagents. Reported `state` = `"working"` if `turnState === "working"` or `runningSubagents > 0`, else `"standby"`. `stateSince` = timestamp of the entry (in the session or a subagent file) that caused the last change of the reported state. `lastActivity` = max over the session file and all its subagent files.
+
 ## AgentSession (`src/agents/source.ts`)
 
 What any agent source exposes per session.
@@ -59,9 +77,10 @@ What any agent source exposes per session.
 | `cwd` | `string \| undefined` | `undefined` until an entry with `cwd` is seen; such a session has `projectId` = `""` and is never main |
 | `model` | `string \| undefined` | |
 | `isMain` | `boolean` | `model !== undefined && mainAgentRegex.test(model)` |
-| `state` | `SessionState` (`"working" \| "standby"`, from `src/contract/sessions.ts`) | 005 extends with `"waiting"` |
+| `state` | `SessionState` (`"working" \| "standby"`, from `src/contract/sessions.ts`) | combined state (see above); 005 extends with `"waiting"` |
+| `runningSubagents` | `number` | |
 | `stateSince` | `string \| undefined` | |
-| `lastActivity` | `string \| undefined` | |
+| `lastActivity` | `string \| undefined` | includes subagent activity |
 
 A file contributes a session only once it has at least one timestamped entry.
 
@@ -78,7 +97,7 @@ A file contributes a session only once it has at least one timestamped entry.
 | Variant | Fields | Emitted when |
 |---------|--------|--------------|
 | `session-added` | `session: AgentSession` | a session is first reported (after its project is resolved) |
-| `session-updated` | `session: AgentSession` | `model`, `isMain`, `cwd`, `projectId` or `projectName` changed |
+| `session-updated` | `session: AgentSession` | `model`, `isMain`, `cwd`, `projectId`, `projectName` or `runningSubagents` changed |
 | `state-changed` | `sessionId`, `projectId`, `from`, `to`, `at` (causing entry's timestamp), `session` | `state` actually changed; exactly once per change |
 
 Events for one file are emitted in entry order after that file's new lines are folded, but intermediate changes within one read are each emitted (a read that contains `prompt … final` emits `standby→working` then `working→standby`).

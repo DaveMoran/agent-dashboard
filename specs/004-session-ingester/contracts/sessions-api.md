@@ -9,7 +9,8 @@ export interface SessionView {
   sessionId: string;
   model: string;
   cwd: string;
-  state: SessionState;
+  state: SessionState;         // "working" while its own turn is open or any subagent runs
+  runningSubagents: number;
   stateSince: string | null;   // ISO 8601
   lastActivity: string;        // ISO 8601
 }
@@ -50,6 +51,7 @@ export interface SessionsResponse {
           "model": "claude-opus-5-5",
           "cwd": "/Users/me/Sites/agent-visualizer",
           "state": "standby",
+          "runningSubagents": 0,
           "stateSince": "2026-10-15T10:03:05.000Z",
           "lastActivity": "2026-10-15T10:03:05.100Z"
         }

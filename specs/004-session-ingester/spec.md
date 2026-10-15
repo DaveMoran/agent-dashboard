@@ -12,7 +12,7 @@
 
 ### User Story 1 - Know whether each main agent is working or on standby (Priority: P1)
 
-A developer has one or more Claude Code sessions open. For each session driven by a main-agent model (Opus or Fable by default), the visualizer works out from the session's transcript whether the agent is currently working on a turn or has finished it and is on standby, and when it was last active. A turn counts as working from the user's prompt until the agent's final reply, including all the time the agent spends calling tools and waiting for subagents it has started.
+A developer has one or more Claude Code sessions open. For each session driven by a main-agent model (Opus or Fable by default), the visualizer works out from the session's transcript whether the agent is currently working on a turn or has finished it and is on standby, and when it was last active. A turn counts as working from the user's prompt until the agent's final reply, including all the time the agent spends calling tools. A main session also counts as working while any subagent it started is still running, even when the subagent was launched in the background and the main agent's own turn has already ended, so a brain stays lit while its subagents work.
 
 **Why this priority**: Working versus standby is the core signal every later V1 feature (brains, live updates, the MAGI panel) is built on. Without it there is nothing to display.
 
@@ -24,9 +24,11 @@ A developer has one or more Claude Code sessions open. For each session driven b
 2. **Given** a main-agent transcript whose last entry is an assistant message that calls a tool, with no result yet, **When** it is read, **Then** the session is `working`.
 3. **Given** a main-agent transcript whose last entry is a tool result, **When** it is read, **Then** the session is `working` (the agent has not replied yet).
 4. **Given** a main-agent transcript whose last entry is the assistant's final reply to the turn (a reply that calls no tool), **When** it is read, **Then** the session is `standby`.
-5. **Given** a turn in which the main agent starts a subagent and the subagent is still running, so the main agent's subagent tool call has no result yet, **When** the main transcript is read, **Then** the session is `working`, and it becomes `standby` only after the subagent's result arrives and the main agent gives its final reply.
-6. **Given** a turn the user interrupted, so the transcript records an interruption after an open prompt or tool call, **When** it is read, **Then** the session is `standby`.
-7. **Given** a session whose state changes from `standby` to `working` or back, **When** the change is detected, **Then** exactly one state-change notification is emitted naming the session, its new state and the time of the entry that caused it.
+5. **Given** a turn in which the main agent starts a subagent in the foreground and the subagent is still running, so the main agent's subagent tool call has no result yet, **When** the transcripts are read, **Then** the session is `working`, and it becomes `standby` only after the subagent's result arrives and the main agent gives its final reply.
+6. **Given** a main agent that launched three subagents in the background and then ended its own turn, while two of the subagents are still working, **When** the transcripts are read, **Then** the session is `working` and reports 2 running subagents; when the last one finishes (its transcript ends with a final reply, or the main transcript records its completion notification) and the main agent's own turn has ended, the session becomes `standby`.
+7. **Given** a subagent whose transcript never got a final reply (for example it was stopped), **When** the main transcript records a completion notification for it with any status, **Then** that subagent no longer counts as running.
+8. **Given** a turn the user interrupted, so the transcript records an interruption after an open prompt or tool call, **When** it is read, **Then** the session is `standby`.
+9. **Given** a session whose state changes from `standby` to `working` or back, **When** the change is detected, **Then** exactly one state-change notification is emitted naming the session, its new state and the time of the entry that caused it.
 
 ---
 
@@ -62,7 +64,7 @@ The developer's setup runs a main agent (Opus or Fable) that hands work to Sonne
 2. **Given** a configured pattern `^claude-sonnet`, **When** the same sessions are read, **Then** only the Sonnet session is a main-agent session.
 3. **Given** an invalid pattern in the configuration, **When** the visualizer starts, **Then** it reports a clear configuration error naming the setting and falls back to the default pattern.
 4. **Given** a session that switched model partway through, **When** it is read, **Then** whether it is a main-agent session follows the model of its most recent assistant entry.
-5. **Given** a subagent's own transcript, **When** transcripts are scanned, **Then** it is never reported as a session of its own; it only affects its parent through the parent's open tool call.
+5. **Given** a subagent's own transcript, **When** transcripts are scanned, **Then** it is never reported as a session of its own, whatever its model; it only affects its parent session's state, running-subagent count and last activity.
 6. **Given** a project whose only sessions are not main-agent sessions, **When** sessions are listed, **Then** that project is not listed.
 
 ---
@@ -125,6 +127,9 @@ The transcript reader is one "agent source": something that knows a set of sessi
 - A turn whose assistant reply is split across several entries (thinking, text, tool calls): only an assistant entry that ends the turn without calling a tool makes the session `standby`.
 - Several tool calls are open at once (parallel tool calls): the session stays `working` until all have results and the agent replies.
 - A session that crashed or was killed mid-turn stays `working` with an old last-activity time. Deciding when such a session no longer counts is left to brain slots (006, idle timeout).
+- A subagent that dies without a final reply or a completion notification keeps its parent `working`, with the subagent's last activity as the session's last activity; as for crashed sessions, 006's idle timeout decides when that stops counting.
+- Subagents started by subagents (nested) are written to the same session's subagent folder and count the same way.
+- A subagent transcript that appears before its parent session file has a timestamped entry is held until the parent appears.
 - Very large transcripts on first start: the existing content is read once to establish state, then only appended content is read.
 - Many sessions change at the same moment (for example a burst of file writes): every change is processed and no state change is lost or duplicated.
 - The same session ID appears under two project folders (rare, after moving a project): it is reported once, using the file with the most recent entry.
@@ -135,25 +140,27 @@ The transcript reader is one "agent source": something that knows a set of sessi
 ### Functional Requirements
 
 - **FR-001**: The system MUST discover session transcript files in every project folder directly under the transcripts root, which defaults to `~/.claude/projects/` and can be overridden in configuration or by environment variable for tests.
-- **FR-002**: The system MUST treat each top-level transcript file in a project folder as one session, identified by the session ID recorded in its entries (falling back to the file name), and MUST NOT treat subagent transcripts as sessions.
+- **FR-002**: The system MUST treat each top-level transcript file in a project folder as one session, identified by the session ID recorded in its entries (falling back to the file name), and MUST NOT treat subagent transcripts as sessions. Subagent transcripts (in the session's own subfolder) MUST be read with the same incremental rules and attached to their parent session.
 - **FR-003**: The system MUST read each transcript incrementally: remember how far it has read, read only appended content, hold back an incomplete last line until it is completed, and start again from the beginning if the file becomes shorter than the remembered position.
 - **FR-004**: From each entry the system MUST extract only: timestamp, session ID, model (assistant entries), working directory, and the entry kind (user prompt, tool call, tool result, final assistant reply, interruption, or other). Message content beyond what is needed to determine the kind MUST NOT be retained.
 - **FR-005**: The system MUST skip lines that are not valid JSON or lack the needed fields, record each skip as an issue (file and line position), and continue reading the rest of the file.
 - **FR-006**: The system MUST group sessions into projects: a project is identified by the shared git directory of the session's working directory, so all worktrees and subfolders of one repository form one project; outside git, or when the folder no longer exists, the project is the working directory itself. The project name is the repository's folder name (or the working directory's folder name outside git).
 - **FR-007**: The system MUST classify a session as a main-agent session when the model of its most recent assistant entry matches a configurable pattern, defaulting to `^claude-(opus|fable)`. An invalid pattern MUST produce a configuration error naming the setting and fall back to the default.
-- **FR-008**: The system MUST derive each main-agent session's state from its transcript alone: `working` from a user prompt until the final assistant reply of that turn, including while any tool call (a subagent call included) has no result; `standby` after a final assistant reply or a recorded interruption, and for a session with no turns yet.
-- **FR-009**: The system MUST record each session's last activity as the timestamp of its most recent timestamped entry.
+- **FR-008**: The system MUST derive each main-agent session's state from its transcripts alone (its own and its subagents'): `working` while its own turn is open (from a user prompt until the final assistant reply of that turn, including while any tool call has no result) or while any of its subagents is running; `standby` otherwise, including after a recorded interruption when no subagent is running, and for a session with no turns yet.
+- **FR-008a**: A subagent is running from its first entry until its transcript ends with a final reply or an interruption, or until its parent transcript records a completion notification for it, whichever comes first. A later entry in the subagent transcript makes it running again.
+- **FR-009**: The system MUST record each session's last activity as the timestamp of its most recent timestamped entry, across its own transcript and its subagents' transcripts.
 - **FR-010**: The system MUST notify consumers of each session state change exactly once, with the session, its project, the new state and the time of the entry that caused it; and MUST notify when a session first appears.
 - **FR-011**: The system MUST notice new transcript files and new project folders while running, and MUST start with no sessions and no error when the transcripts root does not exist, picking it up once it appears.
 - **FR-012**: The session-tracking behavior MUST sit behind an agent source interface that offers: the current sessions with their project, model, state and last activity; subscription to session appearance and state changes, with unsubscription; and start and stop. Consumers MUST depend only on this interface, not on transcripts.
-- **FR-013**: The system MUST expose a sessions endpoint at `/api/sessions` returning every project that has at least one main-agent session, with its identity and name, and its main sessions, each with session ID, model, working directory, state and last activity, ordered most recent first (sessions within a project, and projects by their most recent session). The response's shape MUST be defined in the shared API contract so the UI can use it.
+- **FR-013**: The system MUST expose a sessions endpoint at `/api/sessions` returning every project that has at least one main-agent session, with its identity and name, and its main sessions, each with session ID, model, working directory, state, number of running subagents and last activity, ordered most recent first (sessions within a project, and projects by their most recent session). The response's shape MUST be defined in the shared API contract so the UI can use it.
 - **FR-014**: The system MUST never write to, move, lock or delete transcript files or anything in an observed repository; any state it keeps lives in memory or in the visualizer's own state directory.
-- **FR-015**: Tests MUST use recorded sample transcripts under `fixtures/transcripts/`, covering at least: a plain turn ending in standby; a turn with tool calls; a turn that runs a subagent (with the subagent's own transcript present); an interrupted turn; a non-main (Sonnet) session; a project spanning two worktrees; and malformed and partial lines. Fixture content MUST be trimmed of private conversation text.
+- **FR-015**: Tests MUST use recorded sample transcripts under `fixtures/transcripts/`, covering at least: a plain turn ending in standby; a turn with tool calls; a turn that runs a foreground subagent; a main agent that launches several background subagents, ends its turn, and sees them finish one by one (one of them only through a completion notification); an interrupted turn; a non-main (Sonnet) session; a project spanning two worktrees; and malformed and partial lines. Fixture content MUST be trimmed of private conversation text.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Transcript entry (as read)**: timestamp, session ID, model if present, working directory, and kind (prompt, tool call with its call IDs, tool result with the call IDs it answers, final reply, interruption, other). Nothing else from the entry is kept.
-- **Session**: session ID, transcript file location, model (latest known), working directory (latest), project, whether it is a main-agent session, state (`working` or `standby`; `waiting` is added in 005), open tool calls, last activity time.
+- **Session**: session ID, transcript file location, model (latest known), working directory (latest), project, whether it is a main-agent session, its own turn state, its subagents, combined state (`working` or `standby`; `waiting` is added in 005), number of running subagents, open tool calls, last activity time.
+- **Subagent**: subagent ID (from its file name), parent session, whether it is running, last activity time.
 - **Project**: identity (shared git directory, or working directory outside git), display name, and its sessions.
 - **Agent source**: anything that provides sessions and announces their appearance and state changes; the transcript source is the first.
 - **State change**: session ID, project identity, previous state, new state, time of the causing entry.
@@ -172,9 +179,9 @@ The transcript reader is one "agent source": something that knows a set of sessi
 
 ## Assumptions
 
-- The transcript format is Claude Code's current JSONL: one JSON object per line with fields for type, timestamp, session ID, working directory and, for assistant entries, the model and message content. A final reply is an assistant entry that ends the turn without a tool call; a tool call and its result are linked by a call ID. Subagent transcripts live in a per-session subfolder and are not top-level files.
+- The transcript format is Claude Code's current JSONL: one JSON object per line with fields for type, timestamp, session ID, working directory and, for assistant entries, the model and message content. A final reply is an assistant entry that ends the turn without a tool call; a tool call and its result are linked by a call ID. Subagent transcripts live in a per-session subfolder (`<session>/subagents/agent-<id>.jsonl`), end with a final reply like a main transcript, and background subagents report completion to the parent as a task notification naming the subagent's ID and a status.
 - The server still starts with a repo path in this feature (as since 001); the session ingester runs independently of that path and covers all projects. Starting without a repo path comes in 006.
 - The main-agent pattern lives in the existing `agent-visualizer.config.json` under a new setting; the transcripts root override is also a setting, plus an environment variable for tests.
-- Idle timeouts, ending sessions and brain assignment are out of scope (006). Waiting and session end from hooks are out of scope (005). Subagent sessions, event normalization and spec attribution are out of scope (project view, later).
+- Idle timeouts, ending sessions and brain assignment are out of scope (006). Waiting and session end from hooks are out of scope (005). Showing individual subagents (for example partitioning a brain's panel per running subagent), subagent models and types, event normalization and spec attribution are out of scope (later); V1 only uses subagents to keep the main session working and to count them.
 - Resolving the shared git directory uses read-only git queries and is cached per working directory.
 - Non-main sessions are still read (so a model switch is noticed) but are not listed by the sessions endpoint.
