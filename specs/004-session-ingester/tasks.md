@@ -1,0 +1,186 @@
+---
+
+description: "Task list for 004-session-ingester"
+---
+
+# Tasks: Session Ingester
+
+**Input**: Design documents from `/specs/004-session-ingester/`
+
+**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/ (transcript-format, agent-source, sessions-api), quickstart.md
+
+**Tests**: Included. The spec requires fixture-driven tests (FR-015) and the constitution requires tests that fail when the behavior is removed (Principle V): assert exact kinds, states, ids, counts, timestamps and issue reasons. Use `toStrictEqual` (not `toEqual`) wherever a field must be absent or `undefined`. Every task that adds code adds its tests in the same commit.
+
+**Organization**: Grouped by user story. The pure pieces of User Story 1 (classify, reduce, subagent rule) come first and are the MVP core; User Stories 4, 2 and 3 add the file, project and model pieces; User Story 6 assembles them into the transcript source behind `AgentSource`; User Story 5 serves it over HTTP. Complete phases in order; [P] tasks touch different files and can run in parallel.
+
+## Working rules (from the constitution and CLAUDE.md)
+
+- Work only on branch `004-session-ingester`. Never commit to `main`.
+- One logical commit per task (or tightly related pair), with that task's checkbox ticked in the same commit. Every commit subject ends with `[spec-004]`.
+- Do not edit `spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/` or the constitution. If a contract is wrong or ambiguous, stop and report it.
+- Read-only: nothing in `src/` may write, rename, lock or delete anything under the transcripts root or in an observed repo. The only git command added in `src/` is `rev-parse --path-format=absolute --git-common-dir`, through the existing `runGit` in `src/git/run.ts`.
+- **No test may read `~/.claude`.** Tests build transcript roots in temp directories from `fixtures/transcripts/` with `tests/transcript-fixtures.ts` (T005). Tests that need git repos use `tests/git-helpers.ts` (`makeGitRepo`, `addWorktree`).
+- `src/contract/` imports nothing from `src/server/`, `src/agents/`, `src/core/`, `src/adapters/` or `src/git/`. `src/core/` and `src/adapters/` must not change in this feature.
+- Fixture text is neutral and short (no real conversation content). Use fixed UUIDs and ISO timestamps exactly as written in the tasks.
+- Paths are relative to the repository root. TypeScript strict mode throughout. No new dependencies.
+- Run `bun run verify` before ticking any task that changes code.
+
+---
+
+## Phase 1: Setup
+
+- [ ] T001 Run `git branch --show-current` (expect `004-session-ingester`) and `bun run verify` (expect all 242 existing tests to pass) to confirm a green baseline before any change. No commit needed if nothing changed.
+
+---
+
+## Phase 2: Foundational (blocks all stories)
+
+**Purpose**: Shared types, the agent-source interface, fixture tooling and a stub source.
+
+- [ ] T002 [P] Create `src/contract/sessions.ts` exactly as in `contracts/sessions-api.md`: export `type SessionState = "working" | "standby"`, `interface SessionView { sessionId: string; model: string; cwd: string; state: SessionState; runningSubagents: number; stateSince: string | null; lastActivity: string }`, `interface ProjectView { id: string; name: string; lastActivity: string; sessions: SessionView[] }`, `interface SessionsResponse { projects: ProjectView[] }`. Types only, no imports. Add `tests/contract-boundary.test.ts` with a small checker function `forbiddenImports(source: string): string[]` that returns every `import`/`export … from` specifier mentioning `server/`, `agents/`, `core/`, `adapters/` or `git/`. Test 1: for every `.ts` file under `src/contract/`, the checker returns `[]`. Test 2: the checker returns `["../server/routes"]` for the string `import x from "../server/routes";` (so the check can fail).
+- [ ] T003 [P] Create `src/agents/source.ts` with the types from `data-model.md` and `contracts/agent-source.md`: `interface AgentSession { sessionId: string; source: string; projectId: string; projectName: string; cwd: string | undefined; model: string | undefined; isMain: boolean; state: SessionState; runningSubagents: number; stateSince: string | undefined; lastActivity: string | undefined }` (import `SessionState` from `../contract/sessions`); `type AgentSourceEvent = { type: "session-added"; session: AgentSession } | { type: "session-updated"; session: AgentSession } | { type: "state-changed"; sessionId: string; projectId: string; from: SessionState; to: SessionState; at: string; session: AgentSession }`; `interface IngestIssue { file: string; offset: number; reason: "invalid-json" | "not-an-object" | "missing-field" | "unreadable"; detail: string | undefined }`; and `interface AgentSource { readonly name: string; start(): Promise<void>; stop(): Promise<void>; sessions(): AgentSession[]; subscribe(listener: (event: AgentSourceEvent) => void): () => void; issues(): IngestIssue[] }`. Types only; `bun run verify` must pass.
+- [ ] T004 [P] Create `tests/stub-agent-source.ts` exporting `createStubAgentSource(initial: AgentSession[])` that returns an `AgentSource` (name `"stub"`) plus `emit(event: AgentSourceEvent): void` and `setSessions(sessions: AgentSession[]): void`. `sessions()` returns a copy; `subscribe` returns an unsubscribe function; `emit` calls each current listener inside its own `try/catch`; after `stop()` `emit` delivers nothing; `issues()` returns `[]`. Also export `makeSession(overrides: Partial<AgentSession>): AgentSession` with defaults `{ sessionId: "s1", source: "stub", projectId: "/p/.git", projectName: "p", cwd: "/p", model: "claude-opus-5-5", isMain: true, state: "standby", runningSubagents: 0, stateSince: undefined, lastActivity: "2026-10-15T10:00:00.000Z" }`. Add `tests/stub-agent-source.test.ts`: a subscribed listener gets an emitted event; after unsubscribe it gets nothing; a throwing listener does not stop a second listener; after `stop()` nothing is delivered.
+- [ ] T005 Create `tests/transcript-fixtures.ts` exporting `materializeTranscripts(scenario: string, vars: Record<string, string>): Promise<string>`: copies `fixtures/transcripts/<scenario>/` with `copyFixture` from `tests/helpers.ts` (so `cleanupFixtures()` removes it), then in every `*.jsonl` file below it replaces each `{{NAME}}` with `vars.NAME` (throw if a placeholder has no value), and returns the copied root (a real path). Also export `appendLine(file: string, line: string)` (appends `line + "\n"` with `fs.appendFileSync`) and `appendRaw(file: string, text: string)` (no newline added). Create `fixtures/transcripts/README.md` listing the placeholders `{{REPO}}` (main checkout of a temp git repo), `{{WORKTREE}}` (a second worktree of it), `{{PLAIN}}` (a temp dir outside git), `{{MISSING}}` (a path that does not exist), the line shapes from `contracts/transcript-format.md`, and that all text was replaced with neutral strings. Add `tests/transcript-fixtures.test.ts` using a tiny scenario `fixtures/transcripts/_helper/p/00000000-0000-0000-0000-000000000000.jsonl` containing one line `{"type":"user","timestamp":"2026-10-15T10:00:00.000Z","sessionId":"00000000-0000-0000-0000-000000000000","cwd":"{{PLAIN}}","message":{"role":"user","content":"hi"}}`: after materializing with `{ PLAIN: "/x" }` the copied line contains `"cwd":"/x"`, the checked-in fixture still contains `{{PLAIN}}`, and materializing with `{}` rejects.
+
+**Checkpoint**: shared types compile, stub source and fixture helper are tested.
+
+---
+
+## Phase 3: User Story 1 - Know whether each main agent is working or on standby (Priority: P1) 🎯 MVP core
+
+**Goal**: Pure classification and state rules, including subagents.
+
+**Independent Test**: `tests/transcript-entry.test.ts`, `tests/session-state.test.ts` and `tests/subagents.test.ts` cover every acceptance scenario of US1 without any file I/O.
+
+- [ ] T006 [P] [US1] Create `src/agents/transcripts/entry.ts` implementing `classifyLine(line: string)` exactly per `contracts/transcript-format.md` rules 1–17. Export `type EntryKind = "prompt" | "tool-call" | "tool-result" | "progress" | "final" | "turn-end" | "interrupt" | "other"`, `interface TranscriptEntry { kind: EntryKind; timestamp: string | undefined; sessionId: string | undefined; cwd: string | undefined; model: string | undefined; toolUseIds: string[]; completedAgentIds: string[] }`, and the result type `{ entry: TranscriptEntry } | { issue: { reason: "invalid-json" | "not-an-object" | "missing-field"; field?: string } }`. `model` is set only from assistant `message.model` when it is a non-empty string other than `"<synthetic>"`. For task notifications, extract every `<task-id>X</task-id>` with a regex and include `X` in `completedAgentIds` only if the text also contains a `<status>…</status>` element. Do not keep any other field. Add `tests/transcript-entry.test.ts` with one test per rule (17 rules), plus: the 11 example lines from the contract classify to the listed kinds in order; a `<synthetic>` assistant entry with `stop_reason: "stop_sequence"` is `final` with `model` `undefined`; an assistant entry with a `tool_use` block and `stop_reason: null` is `tool-call` (rule 12 wins over 13); a `user` entry with `isMeta: true` and text `[Request interrupted by user]` is `other` (rule 5 wins); a returned entry object has exactly the keys of `TranscriptEntry` (`Object.keys(...).sort()` compared with `toStrictEqual`).
+- [ ] T007 [US1] Create `src/agents/transcripts/session-state.ts`: export `interface SessionStateT` with the fields of `data-model.md` "SessionState" (`sessionId`, `model`, `cwd`, `state: SessionState`, `stateSince`, `lastActivity`, `openToolUseIds: string[]`, `completedAgentIds: Record<string, string>`, `sawModel: boolean`, `sawStateEntry: boolean`), `initialSessionState(): SessionStateT` (state `"standby"`, everything else empty/undefined/false), and pure `applyEntry(state: SessionStateT, entry: TranscriptEntry): SessionStateT` (returns a new object, never mutates the input). Rules: `prompt`/`tool-call`/`tool-result`/`progress` → `"working"`; `final`/`turn-end`/`interrupt` → `"standby"`; `other` → unchanged; `stateSince` changes only when `state` changes; `lastActivity` = the later of the old value and `entry.timestamp` (compare with `Date.parse`); `sessionId`/`cwd`/`model` take the entry's value when defined; `openToolUseIds` add on `tool-call`, remove answered ids on `tool-result`, clear on `final`/`turn-end`/`interrupt`; each id in `entry.completedAgentIds` is set to `entry.timestamp` in `completedAgentIds`; `sawModel` becomes true when `entry.model` is defined; `sawStateEntry` becomes true for any kind except `other`. Add `tests/session-state.test.ts` folding lines through `classifyLine` + `applyEntry`, one test per US1 acceptance scenario 1–5 and 8, plus: parallel tool calls (two calls, one result → still working, `openToolUseIds` has one id); `other` entries update `lastActivity` but not `state`; an older timestamp does not move `lastActivity` back; `applyEntry` does not mutate its input (deep-freeze the input with `Object.freeze` recursively and call it).
+- [ ] T008 [US1] Create `src/agents/transcripts/subagents.ts` with pure functions: `isSubagentRunning(agentId: string, sub: SessionStateT, parent: SessionStateT): boolean` = `sub.state === "working"` and (`parent.completedAgentIds[agentId]` is undefined, or `Date.parse(sub.lastActivity) > Date.parse(parent.completedAgentIds[agentId])`); and `combineState(turnState: SessionState, runningSubagents: number): SessionState` = `"working"` if `turnState === "working"` or `runningSubagents > 0`, else `"standby"`. Add `tests/subagents.test.ts`: a working subagent with no notification is running; a subagent whose transcript ends in `final` is not; a working subagent named in a parent notification is not (US1 scenario 7); a subagent with an entry newer than its notification is running again; `combineState` truth table (4 cases); US1 scenario 6 in memory: parent folded through `prompt`, three `tool-call`s with `tool-result`s, `final`, `turn-end` plus three subagent states (one `final`, one working but notified, one working) gives turn state `standby`, 1 running subagent, combined `working`; finishing the last one gives combined `standby`.
+
+**Checkpoint**: the state rules are complete and tested in memory.
+
+---
+
+## Phase 4: User Story 4 - Live, incremental reading (Priority: P1)
+
+**Goal**: Read only new bytes, hold partial lines, survive truncation, find session and subagent files.
+
+**Independent Test**: `tests/transcript-tail.test.ts` and `tests/transcript-discover.test.ts` on temp files.
+
+- [ ] T009 [P] [US4] Create `src/agents/transcripts/tail.ts` per research R4/R5 and `data-model.md` "TailState": export `class FileTail` with constructor `(path: string)` and `async read(options?: { fromOffset?: number }): Promise<{ lines: { text: string; offset: number }[]; reset: boolean; bytesRead: number; changed: boolean }>`. Behaviour: `stat` the file (if it is missing or unreadable, throw an `Error` whose message starts with `unreadable:`; the caller records the issue); if `size < offset` reset `offset = 0`, `pending = empty`, and return `reset: true` with lines from the start; if `size === offset && mtimeMs` unchanged return `changed: false` with no lines and `bytesRead: 0`; otherwise read bytes `[start, size)` with `Bun.file(path).slice(start, size).bytes()` where `start = options.fromOffset ?? offset` (when `fromOffset` is given, also clear `pending`), concatenate `pending` + bytes, find the **last byte equal to 10 (`\n`)**, decode everything before it with `new TextDecoder()` and split on `"\n"`, skip empty lines (strip a trailing `"\r"`), keep the rest as `pending`, set `offset = size`, and give each line the absolute byte offset of its first byte. Also export `firstLineBoundary(bytes: Uint8Array): number` (index after the first `\n`, or `-1`) used for the tail window. Add `tests/transcript-tail.test.ts`: two appends read only the new lines and offsets are exact; an append ending mid-line returns nothing for that line until the rest arrives, then exactly once (US4 scenarios 1–2); a 3-byte UTF-8 character (`"€"`) split across two appends decodes correctly; truncating the file (rewrite shorter) returns `reset: true` and the new content (scenario 5); an unchanged file returns `changed: false`, `bytesRead: 0`; a missing file rejects with a message starting `unreadable:`; the file's bytes and mtime are unchanged after reads.
+- [ ] T010 [P] [US4] Create `src/agents/transcripts/discover.ts`: `async listSessionFiles(root: string): Promise<string[]>` returns absolute paths of `<root>/<dir>/<name>.jsonl` (exactly two levels, regular files only, sorted), `[]` if `root` does not exist or is not a directory; `async listSubagentFiles(sessionFile: string): Promise<{ agentId: string; path: string }[]>` returns files `<sessionFile without .jsonl>/subagents/agent-<agentId>.jsonl` (sorted by agentId; `.meta.json` and other names ignored; `[]` if the folder is missing); and `transcriptsRoot(configDir: string | undefined, configValue: string | undefined, env: Record<string, string | undefined>): string` = `env.AGENT_VISUALIZER_TRANSCRIPTS_DIR` if non-empty, else `configValue` (a leading `~/` expanded with `os.homedir()`, a relative path resolved against `configDir`), else `path.join(os.homedir(), ".claude", "projects")`. Add `tests/transcript-discover.test.ts` building a temp tree with: two project folders with sessions, a `notes.txt`, a nested `<session>/subagents/agent-a1.jsonl` and `agent-a1.meta.json`, a `<session>/tool-results/x.jsonl`, and a folder named `x.jsonl`; assert exact lists for both functions (subagent and tool-results files never appear in `listSessionFiles`), a missing root gives `[]` (US4 scenario 6), and the three `transcriptsRoot` precedence cases plus `~/` expansion and relative resolution.
+
+**Checkpoint**: files can be tailed and found.
+
+---
+
+## Phase 5: User Story 2 - Sessions grouped by project, across worktrees (Priority: P1)
+
+**Goal**: Map a working directory to a project.
+
+**Independent Test**: `tests/transcript-project.test.ts` with temp git repos.
+
+- [ ] T011 [US2] Create `src/agents/transcripts/project.ts` per research R7 and `data-model.md` "ProjectRef": export `interface ProjectRef { id: string; name: string; inGit: boolean }`, `projectNameFromCommonDir(commonDir: string): string` (basename of the parent when the path ends in `/.git`; otherwise the basename with a trailing `.git` removed), and `createProjectResolver(run: typeof runGit = runGit): (cwd: string) => Promise<ProjectRef>` that runs `run(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"])`; on `code === 0` returns `{ id: <stdout trimmed>, name: projectNameFromCommonDir(id), inGit: true }`, otherwise `{ id: cwd, name: path.basename(cwd), inGit: false }`. Cache the **promise** per `cwd` so concurrent and repeated calls run git once. Add `tests/transcript-project.test.ts`: with `makeGitRepo()` + `addWorktree(repo, { newBranch: "wt" })`, the main checkout, the worktree and a subfolder of the main checkout all resolve to the same `id` ending in `/.git` and the repo folder's name (US2 scenarios 1–2); two different repos give different ids (scenario 4); a temp dir outside git gives `{ id: dir, name: basename, inGit: false }` (scenario 3); a missing path gives `{ id: path, inGit: false }` (scenario 5); with a counting fake `run`, three calls for the same cwd call it once; `projectNameFromCommonDir("/a/b/repo/.git")` is `"repo"` and `projectNameFromCommonDir("/a/srv/repo.git")` is `"repo"`.
+
+---
+
+## Phase 6: User Story 3 - Only main agents count (Priority: P1)
+
+**Goal**: Configurable main-agent pattern and transcripts root setting.
+
+**Independent Test**: `tests/main-agent.test.ts` and `tests/config.test.ts`.
+
+- [ ] T012 [P] [US3] Create `src/agents/main-agent.ts`: export `DEFAULT_MAIN_AGENT_PATTERN = "^claude-(opus|fable)"` and `compileMainAgentPattern(source: string | undefined): { regex: RegExp; warning: string | undefined }`. `undefined` → default regex, no warning. A valid string → that regex, no warning. An invalid string → default regex and warning `Invalid "mainAgentModel" in config: <regex error message>; using default ^claude-(opus|fable)`. Add `tests/main-agent.test.ts`: with the default, `claude-opus-5-5` and `claude-fable-5-1` match and `claude-sonnet-5-5` and `claude-haiku-5-5` do not (US3 scenario 1); with `"^claude-sonnet"` only the Sonnet id matches (scenario 2); `"("` returns the default regex and a warning containing `mainAgentModel` (scenario 3).
+- [ ] T013 [P] [US3] Extend `src/server/config.ts`: add `mainAgentModel: string | undefined` and `transcriptsDir: string | undefined` to `Config`, read both from the config file, and throw `ConfigValueError` with the existing message style (`Invalid config in <file>: "mainAgentModel" must be a non-empty string, got <json>`; same for `transcriptsDir`) when present but not a non-empty string. Do **not** validate the regex here (T012 does, without failing). Return both as `undefined` when no file is found. Update `tests/config.test.ts`: existing expectations gain the two `undefined` fields (switch them to `toStrictEqual`); add tests for valid values, a number for each setting (rejects with `ConfigValueError` naming the setting), and an invalid regex string `"("` that loads without error.
+
+---
+
+## Phase 7: User Story 6 - Pluggable agent sources: the transcript source (Priority: P2)
+
+**Goal**: Assemble classify, reduce, tail, discover, project and pattern into `createTranscriptSource` behind `AgentSource`, and prove all scenarios end to end on fixtures.
+
+**Independent Test**: `tests/transcript-source.test.ts` drives the source with `pollIntervalMs: 0` and `refresh()`.
+
+- [ ] T014 [US6] Create the fixture scenarios under `fixtures/transcripts/` (one folder per scenario, each laid out as `<scenario>/<project-folder>/<session-uuid>.jsonl`, lines shaped exactly as in `contracts/transcript-format.md`, timestamps on `2026-10-15`, every line with `sessionId` equal to the file's UUID unless stated). Use model `claude-opus-5-5` unless stated. Scenarios:
+  - `plain-turn/`: session `11111111-1111-1111-1111-111111111111` (cwd `{{REPO}}`): `<local-command-caveat>` meta line, `<command-name>/model</command-name>` line, prompt, assistant `thinking` block `stop_reason: "end_turn"`, assistant `text` block `end_turn`, `system` `stop_hook_summary`, `system` `turn_duration`, `file-history-snapshot`. Ends `standby`.
+  - `tool-calls/`: session `22222222-…-222222222222` (cwd `{{REPO}}`): prompt, two assistant `tool_use` blocks (`tu1`, `tu2`, `stop_reason: "tool_use"`), result for `tu1`, result for `tu2`, `text` block `end_turn`, `turn_duration`, then a new prompt and a `tool_use` `tu3` with no result. Ends `working`.
+  - `foreground-subagent/`: session `33333333-…` (cwd `{{REPO}}`): prompt, `tool_use` named `Agent` id `tu1`, no result. Subagent file `33333333-…/subagents/agent-a0000000000000001.jsonl` (model `claude-sonnet-5-5`, `"isSidechain":true`, `"agentId":"a0000000000000001"`, `sessionId` of the parent): prompt, `tool_use` `s1`, result `s1`. Ends `working`, 1 running subagent.
+  - `background-subagents/`: session `44444444-…` (cwd `{{REPO}}`): prompt; three `Agent` `tool_use` blocks `tu1`–`tu3` each followed by its `tool_result` (content `"Async agent launched"`); `text` `end_turn`; `turn_duration`; then a `<task-notification>` prompt naming `<task-id>a0000000000000002</task-id>` with `<status>completed</status>`, `text` `end_turn`, `turn_duration`. Subagents: `agent-a0000000000000001.jsonl` ends with a `text` `end_turn` block; `agent-a0000000000000002.jsonl` ends with a `tool_use` (no final, closed only by the notification, its last timestamp earlier than the notification); `agent-a0000000000000003.jsonl` ends with a `tool_result` (still running). Ends `working`, 1 running subagent, turn state `standby`.
+  - `interrupted/`: session `55555555-…` (cwd `{{REPO}}`): prompt, `thinking` block `stop_reason: null`, `text` block `stop_reason: null`, user `[Request interrupted by user]`. Ends `standby`.
+  - `non-main/`: session `66666666-…` (cwd `{{PLAIN}}`, model `claude-sonnet-5-5`): prompt, `text` `end_turn`. Not main. Second session `67777777-…` (cwd `{{PLAIN}}`): opus prompt then a later assistant `text` `end_turn` with model `claude-sonnet-5-5` (model switch; not main).
+  - `two-worktrees/`: folder `-repo/` session `77777777-…` (cwd `{{REPO}}`) prompt only (`working`, last activity `10:05`); folder `-worktree/` session `88888888-…` (cwd `{{WORKTREE}}`) prompt + `text` `end_turn` (`standby`, last activity `10:02`).
+  - `malformed/`: session `99999999-…` (cwd `{{MISSING}}`): a valid prompt, the line `{not json`, the line `[1,2]`, an assistant line with no `timestamp`, a valid `text` `end_turn` line, then a final valid prompt line **without a trailing newline** (partial).
+  Commit only fixtures and update `fixtures/transcripts/README.md` with a one-line description of each scenario.
+- [ ] T015 [US6] Create `src/agents/transcripts/source.ts` exporting `TranscriptSourceOptions` and `createTranscriptSource(options)` exactly as in `contracts/agent-source.md`, returning `AgentSource & { refresh(): Promise<void> }` with `name: "transcripts"`. Internals (research R6, R8, R12; data-model "SubagentTrack" and "Combined session state"):
+  - Per session file keep `{ tail: FileTail, state: SessionStateT, subagents: Map<agentId, { tail: FileTail, state: SessionStateT }>, project: ProjectRef | undefined, announced: boolean, reported: AgentSession | undefined }`.
+  - `refresh()` runs one pass and never overlaps (if a pass is running, return that pass's promise). A pass: `listSessionFiles(root)`; for each file read new lines with its `FileTail` and fold them with `classifyLine` + `applyEntry` (a classify issue becomes an `IngestIssue` with the line's offset; a `read` error becomes `reason: "unreadable"`); then `listSubagentFiles` and fold each subagent file the same way; drop files that disappeared.
+  - First read of a file larger than `tailWindowBytes` (default `2 * 1024 * 1024`): read with `fromOffset: size - tailWindowBytes`, drop lines before `firstLineBoundary`, fold into a fresh state; if the result has `sawModel && sawStateEntry` (for a subagent file: `sawStateEntry` only) keep it, else fold the whole file from offset 0 with a fresh state.
+  - Build the `AgentSession`: `sessionId` = `state.sessionId ?? <file stem>`; `cwd`; `model`; `projectId`/`projectName` from `resolveProject(cwd)` (default `createProjectResolver()`), or `""`/`""` when `cwd` is undefined; `isMain` = `cwd !== undefined && model !== undefined && mainAgentPattern.test(model)`; `runningSubagents` = count of `isSubagentRunning`; `state` = `combineState(state.state, runningSubagents)`; `lastActivity` = max over the session and subagent states; `stateSince` = timestamp of the entry that last changed the combined state.
+  - A session is first reported once its file has a timestamped entry: fold everything present without emitting, then emit `session-added`. After that, recompute the session after **each** folded line (session or subagent) and emit `state-changed` (`from`, `to`, `at` = that entry's timestamp, `session`) whenever the combined state changes, and `session-updated` when `model`, `isMain`, `cwd`, `projectId`, `projectName` or `runningSubagents` changed without a state change. On a tail `reset`, rebuild that file's state from the returned lines silently, then emit at most one `state-changed` and/or `session-updated` comparing with the previous report.
+  - `sessions()` returns one `AgentSession` per `sessionId`: when two files share one, keep the one with the later `lastActivity`; events from the hidden file are not emitted.
+  - Listeners are called in `try/catch` each. `issues()` keeps the last 200 issues, oldest first. `start()` runs the first pass, then (if `pollIntervalMs > 0`, default 500) starts a `setInterval` calling `refresh()`; `start()` and `stop()` are idempotent; `stop()` clears the timer, waits for a running pass, and after it resolves nothing is emitted.
+  Tests in T016.
+- [ ] T016 [US6] Create `tests/transcript-source.test.ts`. A `setup(scenario)` helper creates `REPO` with `makeGitRepo()`, `WORKTREE` with `addWorktree(REPO, { newBranch: "wt" })`, `PLAIN` with a `mkdtemp` + `realpath` dir, `MISSING` = `PLAIN + "/gone"`, materializes the scenario, and starts `createTranscriptSource({ root, mainAgentPattern: compileMainAgentPattern(undefined).regex, pollIntervalMs: 0 })`. Tests (assert full `AgentSession` objects with `toStrictEqual` where practical):
+  - each scenario from T014 gives the documented `state`, `runningSubagents`, `isMain` and `lastActivity`; `plain-turn` session has `projectName` = REPO's folder name and `projectId` ending `/.git`;
+  - `two-worktrees`: both sessions share one `projectId` (US2, SC-004);
+  - `non-main`: both sessions have `isMain: false`; subagent files never appear in `sessions()` (US3 scenario 5);
+  - `malformed`: `issues()` has exactly three entries with reasons `invalid-json`, `not-an-object`, `missing-field` and increasing offsets; the session is `standby` with `lastActivity` of the `end_turn` line; after `appendRaw(file, "\n")` and `refresh()` it becomes `working` (partial line completed); project is `{{MISSING}}` path with `inGit` false (US2 scenario 5);
+  - events: a listener subscribed before `start()` gets `session-added` once per session; appending a prompt to `plain-turn` and calling `refresh()` emits exactly one `state-changed` `standby → working` with `at` equal to the appended timestamp; appending a prompt and a `final` in one append emits two `state-changed` in order; appending an `other` line emits no `state-changed` (US1 scenario 9);
+  - `background-subagents`: appending a `text` `end_turn` line to `agent-a0000000000000003.jsonl` and `refresh()` emits one `state-changed` `working → standby` with `runningSubagents: 0`; then appending a `tool_use` line to that subagent emits `standby → working` (resumed);
+  - a new session file and a new project folder created after `start()` appear after `refresh()` (US4 scenario 3); a root that does not exist yields `[]` and no issue, and sessions after the folder is created and `refresh()` (scenario 6);
+  - truncation: rewriting `plain-turn`'s file with only its first prompt line and `refresh()` gives `working` and one `state-changed` (US4 scenario 5);
+  - duplicates: copying `plain-turn`'s file into a second project folder with a later appended line yields one session in `sessions()` (R8);
+  - tail window: with `tailWindowBytes: 4096` and a session file padded at the start with 50 `file-history-snapshot` lines of 1 KB each (generated in the test), the session equals the one from a source with the default window; and with a file whose only assistant line is before the window, the model is still found (full-read fallback);
+  - read-only (SC-006): `snapshotTree([root])` and every file's `mtimeMs` are identical before `start()` and after `stop()`;
+  - `stop()`: after it resolves, appending and calling `refresh()` emits nothing.
+  - live timing (SC-002): a second source with `pollIntervalMs: 100`; append a prompt; the `state-changed` arrives within 1000 ms (await a promise resolved by the listener, race it against a 1000 ms timer and assert the listener won).
+
+**Checkpoint**: the transcript source satisfies US1–US4 and US6 on fixtures.
+
+---
+
+## Phase 8: User Story 5 - Ask for the current sessions (Priority: P2)
+
+**Goal**: `GET /api/sessions` from any `AgentSource`, wired into the CLI.
+
+**Independent Test**: `tests/sessions-api.test.ts` with the stub source; `tests/cli.e2e.test.ts` with a fixture root.
+
+- [ ] T017 [US5] Create `src/server/sessions.ts` exporting pure `buildSessionsResponse(sessions: AgentSession[]): SessionsResponse` per `contracts/sessions-api.md`: keep only `isMain` sessions (which always have `cwd`, `model`, `lastActivity`; skip any that lack them), map to `SessionView` (`stateSince ?? null`), group by `projectId`, sort sessions by `lastActivity` descending then `sessionId` ascending, projects by their max `lastActivity` descending then `id` ascending; `ProjectView.lastActivity` = its first session's. Add `tests/sessions-api.test.ts` (part 1) using `makeSession` from `tests/stub-agent-source.ts`: two projects with sessions in mixed order give the exact expected `SessionsResponse` (`toStrictEqual`); non-main sessions and a project with only non-main sessions are excluded (US3 scenario 6); empty input gives `{ projects: [] }` (US5 scenario 2); ties sort by id.
+- [ ] T018 [US5] Wire the route: add optional `agentSource?: AgentSource` to `HandlerOptions` in `src/server/routes.ts` and to `StartOptions` in `src/server/start.ts` (passed through to `createHandler`). In `createHandler`, before the generic `/api/` 404, handle `/api/sessions`: non-GET → `405` with `Allow: GET`; GET → `Response.json(buildSessionsResponse(opts.agentSource?.sessions() ?? []))`. Extend `tests/sessions-api.test.ts` (part 2): a handler built with a stub source returns status 200 and the exact JSON for two projects (US5 scenario 1, ordering per scenario 3); after `setSessions` with changed states the next request reflects them (SC-005: no consumer change); POST returns 405 with `Allow: GET`; a handler without a source returns `{ "projects": [] }`.
+- [ ] T019 [US5] Wire the CLI in `src/cli/index.ts`: after `loadConfig`, compute `const { regex, warning } = compileMainAgentPattern(config.mainAgentModel)` and print `warning` to stderr if set; compute the root with `transcriptsRoot(config.source ? path.dirname(config.source) : undefined, config.transcriptsDir, process.env)`; create the source with `createTranscriptSource({ root, mainAgentPattern: regex })`, `await source.start()` before `startServer`, pass `agentSource: source` to `startServer`, and `await source.stop()` in `shutdown` (and if `startServer` or `writeInstance` throws). Print `Transcripts: <root>` after `Observing:`. In `tests/cli.e2e.test.ts`, make `spawnCli` default `AGENT_VISUALIZER_TRANSCRIPTS_DIR` to a fresh empty temp dir (so no e2e test reads `~/.claude`), and add tests: with the env pointing at a materialized `two-worktrees` scenario, `GET /api/sessions` returns one project with two sessions (`working` first); with a config file `{"mainAgentModel": "("}` the server still starts and stderr contains `mainAgentModel`; startup output contains `Transcripts: ` followed by the env path.
+
+**Checkpoint**: `/api/sessions` serves live main sessions.
+
+---
+
+## Phase 9: Polish, Documentation and PR
+
+- [ ] T020 Update `README.md` (Principle II): under "HTTP API" document `GET /api/sessions` with the response shape and an example from `contracts/sessions-api.md` and what working/standby/runningSubagents mean (including background subagents); under "Config file" document `mainAgentModel` (default `^claude-(opus|fable)`, invalid pattern warns and falls back) and `transcriptsDir` (default `~/.claude/projects`, `~/` and relative paths) plus the `AGENT_VISUALIZER_TRANSCRIPTS_DIR` env var; under "Read-only guarantee" state that transcripts are only read; under "Project structure" add `src/contract/` and `src/agents/`. Update `docs/master-spec.md` where 004 decided things: turn end detected from `end_turn`/`turn_duration`/interrupt lines, polling every 500 ms instead of file watching for transcripts, subagent transcripts and task notifications keep a main session working (background subagents included), and the remaining limitation (a subagent that dies with neither a final reply nor a notification stays running until 006's idle timeout). Commit as `docs(spec-004): document session ingester [spec-004]`.
+- [ ] T021 Run `bun run verify` (all tests pass, including the 242 from before) and `bun run build`. Then run the quickstart section 3 dogfood check manually: start `bun run dev -- .` (no env override), `curl -s http://127.0.0.1:<port>/api/sessions`, and confirm this repo appears with an Opus session; stop the server. Report the result in your reply; do not create a status file. No commit unless something had to be fixed (then commit the fix with its test).
+
+---
+
+## Dependencies & Execution Order
+
+- Phase 1 → Phase 2 → Phase 3 → (Phases 4, 5, 6 in any order; their tasks are independent) → Phase 7 → Phase 8 → Phase 9.
+- T002, T003, T004 are parallel; T004 needs T003's types, so run T003 first if not batching. T005 is independent of T002–T004.
+- T006 → T007 → T008 (each uses the previous module).
+- T009 ∥ T010; T011 alone; T012 ∥ T013.
+- T014 (fixtures) before T016; T015 needs T006–T013; T016 needs T014 and T015.
+- T017 needs T002/T003; T018 needs T017; T019 needs T015, T018 and T014.
+- T020 after T019; T021 last.
+
+### Parallel opportunities
+
+- Phase 2: T002, T003, T005 together; then T004.
+- Phases 4–6: T009, T010, T011, T012, T013 touch different files and can run together after Phase 3.
+- Phase 8: T017 can start as soon as Phase 2 is done, in parallel with Phases 3–7.
+
+Only run parallel subagents in separate worktrees (they share `tasks.md`); in one checkout, run tasks one after another.
+
+## Implementation Strategy
+
+1. **MVP core** (Phases 1–3): the classification and state rules, proven in memory, including background subagents.
+2. **Inputs** (Phases 4–6): file tailing, discovery, project grouping and the main-agent pattern.
+3. **Source** (Phase 7): the transcript source end to end on fixtures; this is the first point where real transcripts can be observed.
+4. **Serve** (Phase 8): `/api/sessions` and CLI wiring, ready for 006 and 007.
+5. **Docs and verification** (Phase 9), then open the PR.
