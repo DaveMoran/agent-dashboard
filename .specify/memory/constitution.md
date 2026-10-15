@@ -31,6 +31,7 @@ Commit work as it is done, not at the end. Each commit is one logical unit, typi
 - Bun for the runtime, package management and tests.
 - React with Vite for the UI; React Flow for graph views; Server-Sent Events for live updates.
 - Local-only: no network calls, telemetry or accounts.
+- UI/server boundary: the UI (`src/web/`) talks to the server only over HTTP and SSE, and imports no server code except the shared API contract module (`src/contract/`). Server code never imports UI code. This keeps the planned split into separate UI and MAGI server repos mechanical.
 - Desktop only: the minimum supported viewport width is 1024px. No layouts, breakpoints or tests for narrower screens. Keyboard navigation, light and dark themes and `prefers-reduced-motion` still apply.
 
 ## Development Workflow
@@ -50,4 +51,4 @@ This constitution supersedes other practices. Amendments require a PR that updat
 
 **Amendment 1.2.1**: Enforcement of Principle I extended to pushes (`.githooks/pre-push`) and to the remote (branch protection), after a direct push to `main` showed the commit-time guard was not enough.
 
-**Amendment 1.3.0**: The product became MAGI, a view of up to three projects at once, so Principle III now covers every observed project and spells out that the optional attention hook writes only to the visualizer's state directory and is installed by the user. Agent SDK mode joins the control features that need their own amendment. Added the desktop-only constraint (1024px minimum width). The development workflow now names Sonnet as the coder, run either as a subagent of the planner or as a separate session, instead of Qwen.
+**Amendment 1.3.0**: The product became MAGI, a view of up to three projects at once, so Principle III now covers every observed project and spells out that the optional attention hook writes only to the visualizer's state directory and is installed by the user. Agent SDK mode joins the control features that need their own amendment. Added the desktop-only constraint (1024px minimum width) and the UI/server boundary, so the UI and the MAGI server can later move to separate repos without untangling code. The development workflow now names Sonnet as the coder, run either as a subagent of the planner or as a separate session, instead of Qwen.

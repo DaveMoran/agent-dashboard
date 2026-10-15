@@ -22,6 +22,7 @@ The tool is **dogfooded**: built with Spec Kit, so its own repo is the first liv
 | Waiting detection | Transcripts give working/standby. "Waiting" needs the opt-in attention hook, which the user installs in their own Claude Code settings and which writes only to the visualizer's state directory. Without it nothing is red |
 | Agent sources | Session state comes through an "agent source" interface: transcripts (004), attention hook (005), later the Agent SDK |
 | Platform | Desktop only, minimum width 1024px |
+| Repo layout | One repo for now: the UI (`src/web/`) and the local MAGI server. The UI reaches the server only over HTTP/SSE and imports only the shared contract module `src/contract/` (constitution, Technology Constraints). They move to separate repos later (see Later) |
 | Stack | TypeScript, Bun server, React + Vite UI, React Flow for DAG, SSE for live updates |
 | Views | V1: MAGI panel only. Later: MAGI panel → project view (sessions + spec board/graph) → per-spec timeline |
 | Build framework | Spec Kit (user familiar; the coder can follow it); constitution kept to a few lines |
@@ -87,6 +88,8 @@ Seeds for each are in [`feature-seeds.md`](feature-seeds.md).
 - **Brain API:** local endpoints to send a message to a brain, read what it is waiting on and get a short summary; the hardware is a client of it.
 - **Hardware controller:** a microphone with three buttons, one per brain. Press a button and speak to send that brain a message; tap a red brain to hear what it is waiting on.
 - Metrics (time and tokens per spec, stall and loop detection).
+- **Split the UI from the MAGI server** into two repos once the UI is solid: after the brain drill-down views (project view, sessions and subagents) have settled through a few versions. Split earlier if a second backend (the incident service) or a non-browser client (the hardware) arrives first. The UI keeps talking to the server over HTTP/SSE; `src/contract/` becomes a published, versioned schema that the UI pins and tests against. Separate repos also suit MAGI itself, since each repo is its own project on its own brain.
+- **Incident takeover:** a separate repo and service that receives production alerts (webhooks from monitoring) and decides when to page. When an incident opens, the UI shows a full-screen takeover styled after Evangelion's power timer: a countdown to when it becomes a real problem (ideally time until the error budget runs out at the current burn rate, not a fixed five minutes), STOP/SLOW/NORMAL/RACING as burn rate or severity, INTERNAL/EXTERNAL as the alert's source. It is network-facing, so it lives outside this repo's local-only, read-only rules; the UI's connection to it needs a constitution amendment. With SDK brains, an incident could be handed to a brain from the takeover screen. Starts only once there is an application in production with alerting.
 
 ## Verification
 - Unit: each adapter tested against a fixture repo under `fixtures/<framework>/` (`bun test`); transcript and hook sources against recorded samples in `fixtures/`.
