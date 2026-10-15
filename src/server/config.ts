@@ -6,6 +6,8 @@ import { AppError } from "./errors.js";
 export type Config = {
   port: number | undefined;
   adapter: string | undefined;
+  mainAgentModel: string | undefined;
+  transcriptsDir: string | undefined;
   source: string | undefined;
 };
 
@@ -41,7 +43,12 @@ export async function loadConfig(repoPath: string, cwd: string = process.cwd()):
       throw new ConfigValueError(`Invalid config in ${file}: top level must be a JSON object`);
     }
 
-    const { port, adapter } = parsed as { port?: unknown; adapter?: unknown };
+    const { port, adapter, mainAgentModel, transcriptsDir } = parsed as {
+      port?: unknown;
+      adapter?: unknown;
+      mainAgentModel?: unknown;
+      transcriptsDir?: unknown;
+    };
     if (port !== undefined) {
       if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) {
         throw new ConfigValueError(
@@ -56,7 +63,29 @@ export async function loadConfig(repoPath: string, cwd: string = process.cwd()):
         );
       }
     }
-    return { port: port as number | undefined, adapter: adapter as string | undefined, source: file };
+    for (const [name, value] of [
+      ["mainAgentModel", mainAgentModel],
+      ["transcriptsDir", transcriptsDir],
+    ] as const) {
+      if (value !== undefined && (typeof value !== "string" || value === "")) {
+        throw new ConfigValueError(
+          `Invalid config in ${file}: "${name}" must be a non-empty string, got ${JSON.stringify(value)}`,
+        );
+      }
+    }
+    return {
+      port: port as number | undefined,
+      adapter: adapter as string | undefined,
+      mainAgentModel: mainAgentModel as string | undefined,
+      transcriptsDir: transcriptsDir as string | undefined,
+      source: file,
+    };
   }
-  return { port: undefined, adapter: undefined, source: undefined };
+  return {
+    port: undefined,
+    adapter: undefined,
+    mainAgentModel: undefined,
+    transcriptsDir: undefined,
+    source: undefined,
+  };
 }
