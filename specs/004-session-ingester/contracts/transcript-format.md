@@ -35,6 +35,15 @@ Common fields copied onto every entry when they are strings: `timestamp`, `sessi
 15. `subtype === "turn_duration"` and `timestamp` present → `turn-end`.
 16. Otherwise → `other`.
 
+## `type: "attachment"`
+
+17a. `attachment.type === "queued_command"` and `attachment.prompt` is a string starting with `<task-notification>` → `other`, with `completedAgentIds` extracted from `attachment.prompt` exactly as in rule 7. (A notice queued while the main agent is busy; it does not start a turn.)
+17b. Otherwise → `other`.
+
+## `type: "continued-in"`
+
+17c. `timestamp` present → `session-end` (the conversation continued in another session file; this session is over).
+
 ## Any other `type`
 
 17. → `other` (unknown types are expected and harmless; no issue).
@@ -56,5 +65,14 @@ Common fields copied onto every entry when they are strings: `timestamp`, `sessi
 ```
 
 Expected kinds, in order: `prompt`, `progress`, `tool-call` (`tu1`), `tool-result` (`tu1`), `final`, `turn-end`, `interrupt`, `other`, `other`, `other`, `prompt` (`completedAgentIds: ["a0b1c2d3e4f5a6b7c"]`).
+
+Two more shapes, seen in Claude Code 2.1.300 (added after the live check of T021):
+
+```jsonl
+{"type":"attachment","timestamp":"2026-10-15T10:08:00.000Z","sessionId":"s1","cwd":"{{REPO}}","attachment":{"type":"queued_command","commandMode":"task-notification","prompt":"<task-notification>\n<task-id>a1111111111111111</task-id>\n<status>completed</status>\n</task-notification>"}}
+{"type":"continued-in","timestamp":"2026-10-15T10:09:00.000Z","sessionId":"s1","continuedInSessionId":"s2"}
+```
+
+Expected: `other` (`completedAgentIds: ["a1111111111111111"]`), `session-end`.
 
 Subagent transcript lines use the same shapes (plus `"isSidechain":true`, `"agentId"`) and are classified by the same function.

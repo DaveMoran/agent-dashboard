@@ -8,13 +8,13 @@ The only thing kept from a JSONL line. Produced by `classifyLine(line)`; rules i
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `kind` | `"prompt" \| "tool-call" \| "tool-result" \| "progress" \| "final" \| "turn-end" \| "interrupt" \| "other"` | |
+| `kind` | `"prompt" \| "tool-call" \| "tool-result" \| "progress" \| "final" \| "turn-end" \| "interrupt" \| "session-end" \| "other"` | |
 | `timestamp` | `string \| undefined` | ISO 8601 as written. Required for every kind except `other`. |
 | `sessionId` | `string \| undefined` | |
 | `cwd` | `string \| undefined` | |
 | `model` | `string \| undefined` | Assistant entries only; never `<synthetic>`. |
 | `toolUseIds` | `string[]` | `tool-call`: ids opened. `tool-result`: ids answered. Otherwise empty. |
-| `completedAgentIds` | `string[]` | `prompt` from a task notification: subagent IDs reported done. Otherwise empty. |
+| `completedAgentIds` | `string[]` | `prompt` from a task notification, or `other` from a queued task notification: subagent IDs reported done. Otherwise empty. |
 
 `classifyLine` returns either `{ entry: TranscriptEntry }` or `{ issue: { reason: "invalid-json" | "not-an-object" | "missing-field", field?: string } }`. The caller adds file and byte position to make an `IngestIssue`.
 
@@ -32,6 +32,7 @@ Per-file reducer state. Pure: `applyEntry(state, entry) -> SessionState` returns
 | `lastActivity` | `string \| undefined` | `undefined` | max of entry timestamps |
 | `openToolUseIds` | `string[]` | `[]` | add on `tool-call`, remove on `tool-result`, clear on `final`/`turn-end`/`interrupt` |
 | `completedAgentIds` | `Record<string, string>` | `{}` | agent ID → timestamp of the notification entry that reported it done |
+| `ended` | `boolean` | `false` | true on `session-end`; false again on any working kind |
 | `sawModel` | `boolean` | `false` | true once an entry with `model` is applied (tail-window check) |
 | `sawStateEntry` | `boolean` | `false` | true once a state-bearing entry is applied (tail-window check) |
 
@@ -42,7 +43,7 @@ Per-file reducer state. Pure: `applyEntry(state, entry) -> SessionState` returns
    ┌─────────┐ ─────────────────────────────────────────────▶ ┌─────────┐
    │ standby │                                                │ working │
    └─────────┘ ◀───────────────────────────────────────────── └─────────┘
-                       final | turn-end | interrupt
+                 final | turn-end | interrupt | session-end
    other: no change (both states)
 ```
 
@@ -58,7 +59,7 @@ The same reducer runs on each subagent file; `state` there is the subagent's own
 | `tail` | `TailState` | |
 | `state` | `SessionState` reducer state | |
 
-**Running** (research R12): `state.state === "working"` and (`agentId` not in parent `completedAgentIds`, or subagent `lastActivity` > the notification timestamp).
+**Running** (research R12): parent not `ended`, `state.state === "working"`, and (`agentId` not in parent `completedAgentIds`, or subagent `lastActivity` > the notification timestamp).
 
 ## Combined session state
 

@@ -25,7 +25,9 @@ Observed facts the rules rely on:
 - Tool results are user entries whose content array contains `tool_result` blocks (sometimes plus `text`).
 - Bookkeeping lines can be several MB (`api-request-blob`).
 - A background subagent's completion reaches the parent as a user entry (not `isMeta`) whose text starts with `<task-notification>` and contains `<task-id>{agentId}</task-id>` and `<status>{status}</status>` (`completed` seen; other values such as `failed` or `killed` are treated the same). It also starts a new turn of the main agent, so it is a `prompt`.
-- Subagent transcripts use the same entry shapes, with `isSidechain: true` and the parent's `sessionId`; they end with an `end_turn` assistant block and no `turn_duration` line.
+- Subagent transcripts use the same entry shapes, with `isSidechain: true` and the parent's `sessionId`. Some end with an `end_turn` assistant block; background coder subagents in Claude Code 2.1.300 end with their hand-back tool call and its result instead, so the notification is the only reliable end signal.
+- **Added after the T021 live check:** a notification that arrives while the main agent is busy is written as `{"type":"attachment","attachment":{"type":"queued_command","commandMode":"task-notification","prompt":"<task-notification>…"}}` instead of a user entry (9 of 13 subagents in the live check). It does not start a turn.
+- **Added after the T021 live check:** when a conversation continues into a new session file (restart, resume), the old file ends with `{"type":"continued-in","continuedInSessionId":…}`. Notifications for its subagents then arrive in the new file.
 
 **Rationale**: FR-004 asks for the minimum; nothing that holds conversation text is retained.
 
@@ -109,4 +111,6 @@ Discovery: in each pass, for every session whose file has a timestamped entry, `
 
 **Alternatives considered**: reading `.meta.json` (agent type, description, `toolUseId`): not needed for V1 counts; useful for the later per-subagent partitions. Matching subagents to parent tool calls via the `async_launched` result's `agentId`: adds nothing for V1 since the file location already gives the parent.
 
-**Remaining limitation**: a subagent that dies with neither a final reply nor a notification keeps its parent `working`; 006's idle timeout bounds this through last activity.
+**Continued sessions**: a `session-end` (from `continued-in`) makes the session `standby` and stops all of its subagents from counting, since their notifications go to the new session.
+
+**Remaining limitation**: a session abandoned mid-turn (a prompt with no reply and no `continued-in`, seen live) stays `working` until 006's idle timeout. A subagent that dies with neither a final reply nor a notification keeps its parent `working`; 006's idle timeout bounds this through last activity.
