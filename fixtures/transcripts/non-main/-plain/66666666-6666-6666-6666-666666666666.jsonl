@@ -1,0 +1,2 @@
+{"type":"user","timestamp":"2026-10-15T10:00:00.000Z","sessionId":"66666666-6666-6666-6666-666666666666","cwd":"{{PLAIN}}","message":{"role":"user","content":"Add a test"}}
+{"type":"assistant","timestamp":"2026-10-15T10:00:01.000Z","sessionId":"66666666-6666-6666-6666-666666666666","cwd":"{{PLAIN}}","message":{"id":"m1","model":"claude-sonnet-5-5","stop_reason":"end_turn","content":[{"type":"text","text":"Done."}]}}

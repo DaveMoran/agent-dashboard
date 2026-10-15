@@ -1,0 +1,6 @@
+{"type":"user","timestamp":"2026-10-15T10:00:00.000Z","sessionId":"99999999-9999-9999-9999-999999999999","cwd":"{{MISSING}}","message":{"role":"user","content":"Add a test"}}
+{not json
+[1,2]
+{"type":"assistant","sessionId":"99999999-9999-9999-9999-999999999999","cwd":"{{MISSING}}","message":{"id":"m0","model":"claude-opus-5-5","stop_reason":"end_turn","content":[{"type":"text","text":"Done."}]}}
+{"type":"assistant","timestamp":"2026-10-15T10:00:03.000Z","sessionId":"99999999-9999-9999-9999-999999999999","cwd":"{{MISSING}}","message":{"id":"m1","model":"claude-opus-5-5","stop_reason":"end_turn","content":[{"type":"text","text":"Done."}]}}
+{"type":"user","timestamp":"2026-10-15T10:00:04.000Z","sessionId":"99999999-9999-9999-9999-999999999999","cwd":"{{MISSING}}","message":{"role":"user","content":"Another request"}}
