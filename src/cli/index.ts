@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import * as path from "node:path";
+import { createAttentionSource } from "../agents/attention/source.js";
 import { compileMainAgentPattern } from "../agents/main-agent.js";
 import { transcriptsRoot } from "../agents/transcripts/discover.js";
 import { createTranscriptSource } from "../agents/transcripts/source.js";
@@ -16,6 +17,7 @@ import {
   isLive,
   readInstance,
   removeInstance,
+  stateRoot,
   writeInstance,
 } from "../server/state.js";
 import { version } from "../server/version.js";
@@ -51,7 +53,11 @@ async function main(): Promise<void> {
     config.transcriptsDir,
     process.env,
   );
-  const source = createTranscriptSource({ root, mainAgentPattern: regex });
+  const transcripts = createTranscriptSource({ root, mainAgentPattern: regex });
+  const source = createAttentionSource({
+    base: transcripts,
+    eventsFile: path.join(stateRoot(), "hooks", "events.jsonl"),
+  });
   await source.start();
 
   let server: Awaited<ReturnType<typeof startServer>>;

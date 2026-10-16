@@ -240,7 +240,7 @@ description: "Task list for 005-attention-hook"
     - A listener unsubscribed gets nothing.
     - After `stop()` nothing is emitted.
     - Fixture files are byte-identical afterwards (copy-first is verified by checksumming `fixtures/attention/`).
-- [ ] T010 [US1] (coder) Wire it in.
+- [X] T010 [US1] (coder) Wire it in.
   - `src/cli/index.ts`: create the transcript source as now, then `createAttentionSource({ base: transcripts, eventsFile: path.join(stateRoot(), "hooks", "events.jsonl") })`. Start and stop the attention source, which starts and stops the base, instead of the transcript source. Pass it as `agentSource`.
   - `tests/sessions-api.test.ts`: add a test where a stub session with `state: "waiting"` appears in the response with `state: "waiting"`.
   - `tests/cli.e2e.test.ts`: add a test with temp `AGENT_VISUALIZER_STATE_DIR` and `AGENT_VISUALIZER_TRANSCRIPTS_DIR`, materialized `permission-main` lines up to `10:00:01` in the transcript, and the `PermissionRequest` line in `<state>/hooks/events.jsonl`. `GET /api/sessions` lists S01 with `state: "waiting"` (poll up to 2 s).
