@@ -25,5 +25,12 @@ Principles and reasons live in `.specify/memory/constitution.md`. This is the sh
 - When the batch is done, the planner runs `bun run verify` once, then commits each task separately in task-ID order, with its box ticked in that commit.
 - Never run tasks in parallel that touch the same file, add a dependency, or need the full test suite or a build to check them.
 
+## Tester and coder (planner running /speckit-implement)
+- Tasks that add or change logic go tester → coder: the `tester` agent writes the task's tests from the spec and contracts (it does not read the implementation); the `coder` agent then implements until they pass and must not change those tests.
+- Neither commits. The planner runs `bun run verify`, then commits tests, code and the ticked box in one commit per task.
+- Wiring-only and docs tasks may go to a single coder. Fixture-only tasks go to the tester.
+- The parallel rules above apply to testers and coders alike.
+- Live and dogfood checks stay with the planner: a tester checks the spec is met, not that the spec is right.
+
 ## Commands
 `bun install` · `bun run dev -- <repo-path>` · `bun run build` · `bun test` · `bun run verify`

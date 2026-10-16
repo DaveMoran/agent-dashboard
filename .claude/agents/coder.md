@@ -34,5 +34,12 @@ If the planner says you are running in parallel mode, other coders are working i
 - Do not commit, do not tick `tasks.md`, and do not run `git add`, `git stash`, `git checkout` or anything else that touches other files.
 - In your report, list every file you created or changed instead of commit hashes.
 
+## Tester-written tests
+If the planner says a tester already wrote the tests for your task, those tests are the specification you code against:
+- Do not edit, delete, skip or loosen those test files (no `.skip`, `.todo`, weaker assertions or changed expected values). Write only the implementation files the task names.
+- Make them pass by implementing the behaviour, not by special-casing test inputs.
+- If a test looks wrong or contradicts the spec or contracts, stop and report which test and why. The planner decides and sends it back to the tester if needed.
+- Do not commit or tick `tasks.md`; the planner commits tests, code and tick together. Run `bun run verify` and report its result.
+
 ## Report
 When done or stopped, reply with: the tasks completed (IDs and commit hashes, or in parallel mode the files changed), the result of the last `bun run verify` (or in parallel mode, of your own test file), and anything left unfinished or that the planner should decide.
