@@ -180,7 +180,7 @@ description: "Task list for 005-attention-hook"
 
 **Independent Test**: `tests/attention-combine.test.ts` (pure) and `tests/attention-source.test.ts` on scenarios 1–5 in timestamp order.
 
-- [ ] T007 [US1] (tester → coder) Hook line classifier. Test file: `tests/hook-line.test.ts`. Code: `src/agents/attention/hook-line.ts`.
+- [X] T007 [US1] (tester → coder) Hook line classifier. Test file: `tests/hook-line.test.ts`. Code: `src/agents/attention/hook-line.ts`.
   - Implement `classifyHookLine(text: string): { event: HookEvent } | { issue: { reason: "invalid-json" | "not-an-object" | "missing-field"; field?: string } }` exactly per `contracts/hook-events.md` "Reader classification".
   - Export `type HookMeaning = "wait-start" | "wait-end" | "session-end" | "ignored"`.
   - Export `interface HookEvent { ts: string; sessionId: string; cwd: string | undefined; event: string; type: string | undefined; agentId: string | undefined; meaning: HookMeaning; agentKey: string }`.
