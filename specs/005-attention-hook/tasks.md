@@ -70,7 +70,7 @@ description: "Task list for 005-attention-hook"
     - An `onActivity` listener receives the session ID exactly once after appending two lines to one session and calling `refresh()`, and nothing after a `refresh()` with no new lines.
     - Appending only to a subagent file still reports the parent's session ID.
     - Nothing is received after unsubscribing.
-- [ ] T006 [P] (tester) Attention fixtures and helper (research R11). Fixtures: `fixtures/attention/<scenario>/projects/-repo/<session>.jsonl` (plus `<session>/subagents/agent-<id>.jsonl` where listed) and `fixtures/attention/<scenario>/events.jsonl`. Helper: `tests/attention-fixtures.ts`.
+- [X] T006 [P] (tester) Attention fixtures and helper (research R11). Fixtures: `fixtures/attention/<scenario>/projects/-repo/<session>.jsonl` (plus `<session>/subagents/agent-<id>.jsonl` where listed) and `fixtures/attention/<scenario>/events.jsonl`. Helper: `tests/attention-fixtures.ts`.
   - **Transcript lines**: use the 004 shapes (`specs/004-session-ingester/contracts/transcript-format.md`, existing `fixtures/transcripts/`). Every session has `cwd` `{{REPO}}`. Assistant lines use model `claude-opus-5-5` in main transcripts and `claude-sonnet-5-5` in subagent transcripts.
   - **Event lines**: follow `contracts/hook-events.md`, with `"cwd":"{{REPO}}"`.
   - **Session IDs**: `a0050000-0000-0000-0000-0000000000NN`, where `NN` is the scenario number below.
