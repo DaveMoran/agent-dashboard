@@ -193,7 +193,7 @@ description: "Task list for 005-attention-hook"
     - `UserPromptSubmit` with an `agent` field still has `agentKey` `""`;
     - an unknown event is `ignored`.
   - Also each issue case with its `field`, and an exact key-set check on `HookEvent`.
-- [ ] T008 [US1] (tester → coder) Pure combine. Test file: `tests/attention-combine.test.ts`. Code: `src/agents/attention/combine.ts`. Implement `data-model.md` "AttentionRecord" and "Combined state", with the maps as plain records:
+- [X] T008 [US1] (tester → coder) Pure combine. Test file: `tests/attention-combine.test.ts`. Code: `src/agents/attention/combine.ts`. Implement `data-model.md` "AttentionRecord" and "Combined state", with the maps as plain records:
   - `interface AttentionRecord { waitAt: Record<string, string>; hookClearAt: Record<string, string>; endAt: string | undefined; lastHookAt: string | undefined; newestAt: string | undefined }`
   - `emptyRecord()`
   - `applyHookEvent(record, event: HookEvent): AttentionRecord`, which is pure and keeps maxima:
