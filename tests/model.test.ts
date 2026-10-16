@@ -28,12 +28,15 @@ describe("shared constants", () => {
 });
 
 describe("validateEvent", () => {
-  test.each(["planner", "coder", "human", "git"] as Role[])("accepts role %s with and without specId", (role) => {
-    const without = validateEvent({ ...base, role });
-    expect(without).toEqual({ ok: true, event: { ...base, role } });
-    const withId = validateEvent({ ...base, role, specId: "002" });
-    expect(withId).toEqual({ ok: true, event: { ...base, role, specId: "002" } });
-  });
+  test.each(["planner", "coder", "human", "git"] as Role[])(
+    "accepts role %s with and without specId",
+    (role) => {
+      const without = validateEvent({ ...base, role });
+      expect(without).toEqual({ ok: true, event: { ...base, role } });
+      const withId = validateEvent({ ...base, role, specId: "002" });
+      expect(withId).toEqual({ ok: true, event: { ...base, role, specId: "002" } });
+    },
+  );
 
   test("drops unknown fields and passes detail through untouched", () => {
     const detail = { nested: [1, { a: null }] };

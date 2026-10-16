@@ -6,7 +6,8 @@ const FORBIDDEN = /(server\/|agents\/|core\/|adapters\/|git\/)/;
 
 export function forbiddenImports(source: string): string[] {
   const found: string[] = [];
-  const re = /(?:\bimport\b|\bexport\b)[^;'"]*?\bfrom\s*["']([^"']+)["']|\bimport\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
+  const re =
+    /(?:\bimport\b|\bexport\b)[^;'"]*?\bfrom\s*["']([^"']+)["']|\bimport\s*["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
   for (const m of source.matchAll(re)) {
     const spec = m[1] ?? m[2] ?? m[3];
     if (spec && FORBIDDEN.test(spec)) found.push(spec);

@@ -41,10 +41,7 @@ async function tempDir(): Promise<string> {
 }
 
 /** A fresh git repo, optionally filled from a fixture and committed. */
-export async function makeGitRepo(
-  fixture?: string,
-  options: { branch?: string } = {},
-): Promise<string> {
+export async function makeGitRepo(fixture?: string, options: { branch?: string } = {}): Promise<string> {
   const dir = fixture === undefined ? await tempDir() : await copyFixture(fixture);
   await git(dir, "init", "-q", "-b", options.branch ?? "main");
   if (fixture !== undefined) await commitAll(dir, "fixture");

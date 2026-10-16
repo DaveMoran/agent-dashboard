@@ -21,7 +21,7 @@ export async function materializeTranscripts(
   for (const file of jsonlFiles(root)) {
     const text = readFileSync(file, "utf8");
     const filled = text.replace(/\{\{([A-Za-z0-9_]+)\}\}/g, (_m, name: string) => {
-      if (!Object.prototype.hasOwnProperty.call(vars, name)) {
+      if (!Object.hasOwn(vars, name)) {
         throw new Error(`No value for placeholder {{${name}}} in ${file}`);
       }
       return vars[name]!;
@@ -32,7 +32,7 @@ export async function materializeTranscripts(
 }
 
 export function appendLine(file: string, line: string): void {
-  appendFileSync(file, line + "\n");
+  appendFileSync(file, `${line}\n`);
 }
 
 export function appendRaw(file: string, text: string): void {

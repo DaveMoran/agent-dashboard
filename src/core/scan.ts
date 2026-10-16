@@ -1,6 +1,7 @@
+import type { Dirent } from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
-import type { Adapter, RepoContext } from "./adapter";
+import type { Adapter, RepoContext, WatchTarget } from "./adapter";
 import type { Issue, Snapshot } from "./model";
 import { validateSpecs } from "./validate";
 
@@ -20,7 +21,7 @@ const PRUNED_DIRS = new Set([".git", "node_modules"]);
 async function walk(root: string, issues: Issue[]): Promise<string[]> {
   const files: string[] = [];
   async function visit(dir: string, rel: string): Promise<void> {
-    let entries;
+    let entries: Dirent[];
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch (err) {
@@ -47,15 +48,12 @@ export function emptySnapshot(adapter: string | null = null): Snapshot {
   return { specs: [], issues: [], adapter, scannedAt: new Date().toISOString() };
 }
 
-export async function scan(
-  adapter: Adapter | null,
-  ctx: RepoContext,
-): Promise<ScanResult> {
+export async function scan(adapter: Adapter | null, ctx: RepoContext): Promise<ScanResult> {
   if (adapter === null) {
     return { ok: true, snapshot: emptySnapshot(null) };
   }
 
-  let targets;
+  let targets: WatchTarget[];
   try {
     targets = await adapter.discover(ctx);
   } catch (err) {

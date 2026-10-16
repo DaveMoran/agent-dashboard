@@ -1,12 +1,4 @@
-export const STATUSES = [
-  "drafted",
-  "planned",
-  "ready",
-  "in-progress",
-  "review",
-  "done",
-  "blocked",
-] as const;
+export const STATUSES = ["drafted", "planned", "ready", "in-progress", "review", "done", "blocked"] as const;
 export type SpecStatus = (typeof STATUSES)[number];
 
 export const ROLES = ["planner", "coder", "human", "git"] as const;

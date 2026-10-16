@@ -70,9 +70,7 @@ export const speckitAdapter: Adapter = {
     for (const copy of groupFeatureFiles(ctx.roots, files)) {
       byDir.set(copy.dirName, [...(byDir.get(copy.dirName) ?? []), copy]);
     }
-    const chosen = [...byDir.values()].map((copies) =>
-      pickAuthoritative(copies, rootBranches, ctx.roots),
-    );
+    const chosen = [...byDir.values()].map((copies) => pickAuthoritative(copies, rootBranches, ctx.roots));
 
     const specs: Array<{ dirName: string; spec: RawSpec }> = [];
     for (const copy of chosen) {
@@ -106,7 +104,15 @@ export const speckitAdapter: Adapter = {
 
     return specs
       .sort((a, b) =>
-        a.spec.id < b.spec.id ? -1 : a.spec.id > b.spec.id ? 1 : a.dirName < b.dirName ? -1 : a.dirName > b.dirName ? 1 : 0,
+        a.spec.id < b.spec.id
+          ? -1
+          : a.spec.id > b.spec.id
+            ? 1
+            : a.dirName < b.dirName
+              ? -1
+              : a.dirName > b.dirName
+                ? 1
+                : 0,
       )
       .map((s) => s.spec);
   },

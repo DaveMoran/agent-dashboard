@@ -38,28 +38,28 @@ export function parseCliArgs(argv: string[]): CliOptions {
       args: argv,
       options: {
         port: {
-          type: "string"
+          type: "string",
         },
         help: {
-          type: "boolean"
+          type: "boolean",
         },
         version: {
-          type: "boolean"
-        }
+          type: "boolean",
+        },
       },
       allowPositionals: true,
-      strict: true
+      strict: true,
     });
 
     const { port } = values;
 
-    let repoPath: string | undefined = undefined;
+    let repoPath: string | undefined;
     if (positionals.length > 0) {
       repoPath = positionals[0];
     }
 
     // Validate port if provided
-    let validatedPort: number | undefined = undefined;
+    let validatedPort: number | undefined;
     if (port !== undefined) {
       // Check if port matches the required pattern /^\d+$/
       if (!/^\d+$/.test(port)) {
@@ -93,7 +93,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
       repoPath,
       port: validatedPort,
       help,
-      version
+      version,
     };
   } catch (error) {
     if (error instanceof UsageError) {

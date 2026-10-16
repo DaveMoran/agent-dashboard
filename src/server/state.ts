@@ -26,7 +26,10 @@ export function stateRoot(): string {
 }
 
 export function repoKey(repoPath: string): string {
-  const slug = path.basename(repoPath).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const slug = path
+    .basename(repoPath)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
   const hash = createHash("sha1").update(repoPath).digest("hex").slice(0, 8);
   return `${slug}-${hash}`;
 }
@@ -53,7 +56,7 @@ export async function writeInstance(record: InstanceRecord): Promise<void> {
   const tmp = path.join(dir, `.server.json.${process.pid}.${Date.now()}.tmp`);
   try {
     await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
-    await fs.promises.writeFile(tmp, JSON.stringify(record, null, 2) + "\n");
+    await fs.promises.writeFile(tmp, `${JSON.stringify(record, null, 2)}\n`);
     await fs.promises.rename(tmp, file);
   } catch (error) {
     await fs.promises.rm(tmp, { force: true }).catch(() => {});

@@ -2,10 +2,7 @@ import { useEffect, useState } from "react";
 
 type Health = { status: string; repoPath: string; repoName: string; version: string };
 
-type State =
-  | { kind: "loading" }
-  | { kind: "ready"; health: Health }
-  | { kind: "error"; message: string };
+type State = { kind: "loading" } | { kind: "ready"; health: Health } | { kind: "error"; message: string };
 
 export function App() {
   const [state, setState] = useState<State>({ kind: "loading" });

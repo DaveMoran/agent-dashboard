@@ -50,7 +50,7 @@ async function serveStatic(req: Request, url: URL, webRoot: string): Promise<Res
     return new Response("Bad Request", { status: 400 });
   }
 
-  const requested = path.resolve(root, "." + pathname);
+  const requested = path.resolve(root, `.${pathname}`);
   if (!isInside(root, requested)) {
     return new Response("Not Found", { status: 404 });
   }

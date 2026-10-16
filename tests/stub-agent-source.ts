@@ -1,8 +1,4 @@
-import type {
-  AgentSession,
-  AgentSource,
-  AgentSourceEvent,
-} from "../src/agents/source";
+import type { AgentSession, AgentSource, AgentSourceEvent } from "../src/agents/source";
 
 export function makeSession(overrides: Partial<AgentSession> = {}): AgentSession {
   return {

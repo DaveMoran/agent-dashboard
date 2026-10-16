@@ -42,7 +42,7 @@ test("relative path resolves against cwd", async () => {
 test("trailing slash is removed from the result", async () => {
   const dir = path.join(base, "slash-app");
   fs.mkdirSync(dir);
-  const result = await resolveRepoPath(dir + "/");
+  const result = await resolveRepoPath(`${dir}/`);
   expect(result.path).toBe(dir);
   expect(result.path.endsWith("/")).toBe(false);
 });

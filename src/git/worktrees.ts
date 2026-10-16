@@ -15,7 +15,6 @@ export function parseWorktreePorcelain(text: string): Worktree[] {
       if (line.startsWith("worktree ")) {
         wt = { path: line.slice("worktree ".length), branch: null, bare: false, prunable: false };
       } else if (wt === null) {
-        continue;
       } else if (line.startsWith("branch ")) {
         const ref = line.slice("branch ".length);
         wt.branch = ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ref;
