@@ -15,6 +15,7 @@
     "test": "bun test",
     "verify": "biome check --error-on-warnings . && tsc --noEmit && bun test",
     "live-check": "bun scripts/live-check.ts",
+    "hook-settings": "bun scripts/hook-settings.ts",
     "lint": "biome check --error-on-warnings .",
     "lint:fix": "biome check --write ."
   },

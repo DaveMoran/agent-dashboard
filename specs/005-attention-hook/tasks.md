@@ -297,7 +297,7 @@ description: "Task list for 005-attention-hook"
   - 10 concurrent spawns give 10 complete, parseable lines.
   - The script's source imports only `node:fs`, `node:os` and `node:path` (read the file and check its import specifiers).
   - The path it writes equals `path.join(stateRoot(), "hooks", "events.jsonl")` from `src/server/state.ts` for the same env.
-- [ ] T014 [US3] (tester → coder) Settings snippet. Test file: `tests/hook-settings.test.ts`. Code: `src/agents/attention/settings.ts`, `scripts/hook-settings.ts` and a `"hook-settings": "bun scripts/hook-settings.ts"` script in `package.json`.
+- [X] T014 [US3] (tester → coder) Settings snippet. Test file: `tests/hook-settings.test.ts`. Code: `src/agents/attention/settings.ts`, `scripts/hook-settings.ts` and a `"hook-settings": "bun scripts/hook-settings.ts"` script in `package.json`.
   - `settings.ts` exports `HOOK_REGISTRATIONS: readonly { event: string; matcher?: string; async: boolean }[]` with exactly the rows of the snippet in `contracts/hook-events.md`.
   - It also exports `buildHookSettings(bunPath: string, scriptPath: string): { hooks: Record<string, { matcher?: string; hooks: { type: "command"; command: string; async?: true }[] }[]> }`, producing that snippet with `command` = `` `${bunPath} ${scriptPath}` `` (quote either path with double quotes if it contains a space).
   - `scripts/hook-settings.ts` prints `JSON.stringify(buildHookSettings(process.execPath, <absolute path of hooks/attention-hook.ts>), null, 2)` and writes no file.
