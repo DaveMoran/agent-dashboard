@@ -167,7 +167,9 @@ Spec data reaches the app through adapters, one per spec framework, all mapping 
 | `bun run build` | Builds the UI to `dist/web`. |
 | `bun test` | Runs the unit, integration and end-to-end tests (they use temp directories and a temp state dir, never your real `~/.agent-visualizer`). |
 | `bun run live-check [repo-path]` | Scans a repo (default: this one) with the Spec Kit adapter and prints its roots, specs and issues. Read-only; not part of `bun test`. |
-| `bun run verify` | Type check (`tsc --noEmit`) and `bun test`. Run this before calling work done. |
+| `bun run lint` | Biome lint and format check; fails on warnings. |
+| `bun run lint:fix` | Applies Biome's safe lint fixes and formatting. |
+| `bun run verify` | Lint (`bun run lint`), type check (`tsc --noEmit`) and `bun test`. Run this before calling work done. |
 
 ## Read-only guarantee
 
@@ -207,3 +209,4 @@ Work is done by a **planner** (Claude Opus, plan mode) that writes specs and a *
 - Commit one logical unit at a time; every commit subject ends with `[spec-NNN]`.
 - Enable the repo's git hooks once per clone: `git config core.hooksPath .githooks` (refuses commits and pushes on `main` and requires the `[spec-NNN]` tag). `main` is also protected on GitHub, so every change goes through a pull request.
 - Run `bun run verify` before calling a task done.
+- Every pull request runs the `verify` GitHub check (`.github/workflows/ci.yml`: lint, type check, tests, build). It must pass before `main` accepts the merge.
