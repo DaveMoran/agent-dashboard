@@ -153,6 +153,7 @@ test("successful start prints the startup lines and serves health", async () => 
     repoPath: repoDir,
     repoName: "demo-repo",
     version: pkg.version,
+    attentionHook: { seen: false, lastEventAt: null },
   });
   child.kill("SIGKILL");
 });

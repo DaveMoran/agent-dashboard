@@ -10,7 +10,7 @@ import { createTranscriptSource } from "../src/agents/transcripts/source";
 import { emptyCopy, materializeAttention, scenarioLines } from "./attention-fixtures";
 import { makeGitRepo } from "./git-helpers";
 import { FIXTURES, cleanupFixtures } from "./helpers";
-import { appendLine, materializeTranscripts } from "./transcript-fixtures";
+import { appendLine, appendRaw, materializeTranscripts } from "./transcript-fixtures";
 
 type Attention = ReturnType<typeof createAttentionSource>;
 
@@ -666,4 +666,40 @@ test("session-end: S08 ends and S09 is standby in every read order; S09 only end
       expect(events.filter((e) => e.type === "session-added" && e.session.sessionId === S09).length).toBe(1);
     }
   }
+});
+
+// --- T017: hook status and ingest issues (FR-015, contract health) ---
+
+test("T017 malformed-events: hookStatus ignores invalid lines and follows the partial line once completed; issues list the four bad lines", async () => {
+  const { attention, lines, feed } = await prepare("malformed-events", sid("11"));
+  const eventsFile = lines.find((l) => l.file.endsWith("events.jsonl"))!.file;
+  expect(attention.hookStatus()).toStrictEqual({ seen: false, lastEventAt: null });
+  // Events lines in their original file order; the fixture's last line has no trailing newline and stays partial.
+  const raw = readFileSync(
+    path.join(FIXTURES, "attention", "malformed-events", "events.jsonl"),
+    "utf8",
+  ).split("\n");
+  const key = (text: string) => raw.findIndex((r) => r.slice(0, 40) === text.slice(0, 40));
+  const eventLines = lines.filter((l) => l.file === eventsFile).sort((x, y) => key(x.text) - key(y.text));
+  expect(eventLines).toHaveLength(6);
+  for (const l of lines) if (l.file !== eventsFile) await feed(l);
+  for (const [i, l] of eventLines.entries()) {
+    appendRaw(eventsFile, i === eventLines.length - 1 ? l.text : `${l.text}\n`);
+  }
+  await attention.refresh();
+  expect(attention.hookStatus()).toStrictEqual({ seen: true, lastEventAt: T("10:00:03.000") });
+
+  appendRaw(eventsFile, "\n");
+  await attention.refresh();
+  expect(attention.hookStatus()).toStrictEqual({ seen: true, lastEventAt: T("10:00:04.000") });
+
+  const mine = attention.issues().filter((i) => i.file === eventsFile);
+  expect(mine.map((i) => [i.reason, i.detail])).toStrictEqual([
+    ["invalid-json", mine[0]!.detail],
+    ["not-an-object", mine[1]!.detail],
+    ["missing-field", "session"],
+    ["missing-field", "ts"],
+  ]);
+  expect(mine.length).toBe(4);
+  for (let i = 1; i < mine.length; i++) expect(mine[i - 1]!.offset).toBeLessThan(mine[i]!.offset);
 });

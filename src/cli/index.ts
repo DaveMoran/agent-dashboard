@@ -67,6 +67,7 @@ async function main(): Promise<void> {
       port,
       devUi: process.env.AGENT_VISUALIZER_DEV_UI,
       agentSource: source,
+      hookStatus: () => source.hookStatus(),
     });
   } catch (error) {
     await source.stop();

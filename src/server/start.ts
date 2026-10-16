@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import type { HookStatus } from "../agents/attention/source.js";
 import type { AgentSource } from "../agents/source.js";
 import { HOST } from "./constants.js";
 import { listenWithFallback } from "./port.js";
@@ -12,6 +13,7 @@ export type StartOptions = {
   webRoot?: string;
   devUi?: string;
   agentSource?: AgentSource;
+  hookStatus?: () => HookStatus;
 };
 
 export type RunningServer = {
@@ -31,6 +33,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     webRoot: opts.webRoot ?? DEFAULT_WEB_ROOT,
     devUi: opts.devUi,
     agentSource: opts.agentSource,
+    hookStatus: opts.hookStatus,
   });
   const { server, fellBack } = listenWithFallback(opts.port, (port) =>
     Bun.serve({ hostname: HOST, port, fetch }),

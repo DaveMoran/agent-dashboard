@@ -342,7 +342,7 @@ description: "Task list for 005-attention-hook"
 
 ## Phase 8: User Story 6 - Check that the hook is working (Priority: P3)
 
-- [ ] T017 [US6] (tester → coder) Health status (FR-015, `contracts/http-api.md`). Test files: `tests/server.test.ts` (update the exact-body test, add one) and `tests/attention-source.test.ts` (add). Code: `src/agents/attention/source.ts` (`hookStatus()`), `src/server/routes.ts`, `src/server/start.ts`, `src/cli/index.ts`.
+- [X] T017 [US6] (tester → coder) Health status (FR-015, `contracts/http-api.md`). Test files: `tests/server.test.ts` (update the exact-body test, add one) and `tests/attention-source.test.ts` (add). Code: `src/agents/attention/source.ts` (`hookStatus()`), `src/server/routes.ts`, `src/server/start.ts`, `src/cli/index.ts`.
   - `hookStatus()` returns `seen: true` and `lastEventAt` = the max `ts` of valid lines once any valid line has been read, else `{ seen: false, lastEventAt: null }`. Invalid lines don't count.
   - `HandlerOptions` and `StartOptions` gain `hookStatus?: () => HookStatus`. The health body is typed `HealthResponse` and adds `attentionHook: opts.hookStatus?.() ?? { seen: false, lastEventAt: null }`.
   - The CLI passes `attention.hookStatus`.
