@@ -27,12 +27,19 @@ afterEach(async () => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-async function start(opts: { webRoot?: string; devUi?: string } = {}) {
+async function start(
+  opts: {
+    webRoot?: string;
+    devUi?: string;
+    hookStatus?: () => { seen: boolean; lastEventAt: string | null };
+  } = {},
+) {
   const server = await startServer({
     repo: { path: repoDir, name: "demo-repo" },
     port: 0,
     webRoot: opts.webRoot ?? webRoot,
     devUi: opts.devUi,
+    hookStatus: opts.hookStatus,
   });
   stops.push(server.stop);
   return server;
@@ -54,6 +61,20 @@ test("GET /api/health returns the exact JSON body", async () => {
     repoPath: repoDir,
     repoName: "demo-repo",
     version,
+    attentionHook: { seen: false, lastEventAt: null },
+  });
+});
+
+test("GET /api/health reports the hook status from hookStatus (T017, FR-015)", async () => {
+  const server = await start({ hookStatus: () => ({ seen: true, lastEventAt: "2026-10-15T10:00:02.000Z" }) });
+  const res = await fetch(`${server.url}/api/health`);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({
+    status: "ok",
+    repoPath: repoDir,
+    repoName: "demo-repo",
+    version,
+    attentionHook: { seen: true, lastEventAt: "2026-10-15T10:00:02.000Z" },
   });
 });
 

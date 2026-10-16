@@ -1,0 +1,6 @@
+{not json
+[1]
+{"ts":"2026-10-15T10:00:02.000Z","event":"PermissionRequest"}
+{"ts":"nope","session":"a0050000-0000-0000-0000-000000000011","event":"PermissionRequest"}
+{"ts":"2026-10-15T10:00:03.000Z","session":"a0050000-0000-0000-0000-000000000011","cwd":"{{REPO}}","event":"PermissionRequest","type":"Bash"}
+{"ts":"2026-10-15T10:00:04.000Z","session":"a0050000-0000-0000-0000-000000000011","cwd":"{{REPO}}","event":"UserPromptSubmit"}

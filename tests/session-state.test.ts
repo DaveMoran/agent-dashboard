@@ -49,6 +49,7 @@ test("initial state is standby and empty", () => {
     openToolUseIds: [],
     completedAgentIds: {},
     ended: false,
+    lastTurnAt: undefined,
   });
 });
 
@@ -185,4 +186,71 @@ test("a queued notification records the agent id without changing state", () => 
   expect(s.state).toBe("working");
   expect(s.stateSince).toBe(T(1));
   expect(s.completedAgentIds).toEqual({ a1: T(2) });
+});
+
+const progressLine = (t: string) =>
+  j({
+    type: "assistant",
+    timestamp: t,
+    sessionId: "s1",
+    message: { model: "claude-opus-5-5", stop_reason: null, content: [{ type: "text", text: "..." }] },
+  });
+const turnEnd = (t: string) => j({ type: "system", subtype: "turn_duration", timestamp: t, sessionId: "s1" });
+const interruptLine = (t: string) => u(t, [{ type: "text", text: "[Request interrupted by user]" }]);
+
+test("lastTurnAt starts undefined", () => {
+  expect(initialSessionState().lastTurnAt).toBeUndefined();
+});
+
+test("lastTurnAt follows a prompt then a tool call", () => {
+  expect(fold([u(T(0))]).lastTurnAt).toBe(T(0));
+  expect(fold([u(T(0)), call(T(1), "t1")]).lastTurnAt).toBe(T(1));
+});
+
+test("an other entry moves lastActivity but not lastTurnAt", () => {
+  const s = fold([u(T(0)), call(T(1), "t1"), j({ type: "file-history-snapshot", timestamp: T(5) })]);
+  expect(s.lastTurnAt).toBe(T(1));
+  expect(s.lastActivity).toBe(T(5));
+  const only = fold([j({ type: "file-history-snapshot", timestamp: T(5) })]);
+  expect(only.lastTurnAt).toBeUndefined();
+  expect(only.lastActivity).toBe(T(5));
+});
+
+test("a queued notification (other) does not move lastTurnAt", () => {
+  const s = fold([u(T(1)), queuedNote(T(4), "a1")]);
+  expect(s.lastTurnAt).toBe(T(1));
+});
+
+test.each([
+  ["tool-result", result(T(7), "t1")],
+  ["progress", progressLine(T(7))],
+  ["final", final(T(7))],
+  ["turn-end", turnEnd(T(7))],
+  ["interrupt", interruptLine(T(7))],
+  ["session-end", sessionEnd(T(7))],
+])("%s entry moves lastTurnAt", (_name, line) => {
+  const s = fold([u(T(1)), call(T(2), "t1"), line]);
+  expect(s.lastTurnAt).toBe(T(7));
+});
+
+test("an older timestamp does not move lastTurnAt back", () => {
+  const s = fold([u(T(5)), call(T(2), "t1")]);
+  expect(s.lastTurnAt).toBe(T(5));
+});
+
+test("an equal timestamp keeps lastTurnAt", () => {
+  const s = fold([u(T(3)), call(T(3), "t1")]);
+  expect(s.lastTurnAt).toBe(T(3));
+});
+
+test("lastTurnAt compares by parsed time, not text", () => {
+  const s = fold([u("2026-10-15T10:00:00.500Z"), call("2026-10-15T11:00:00+01:00", "t1")]);
+  expect(s.lastTurnAt).toBe("2026-10-15T10:00:00.500Z");
+});
+
+test("applyEntry for lastTurnAt does not mutate its input", () => {
+  const frozen = deepFreeze(fold([u(T(1))]));
+  const out = applyEntry(frozen, entryOf(call(T(2), "t1")));
+  expect(out.lastTurnAt).toBe(T(2));
+  expect(frozen.lastTurnAt).toBe(T(1));
 });

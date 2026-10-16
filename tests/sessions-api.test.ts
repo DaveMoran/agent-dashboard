@@ -179,3 +179,25 @@ test("a handler without a source returns no projects", async () => {
   expect(res.status).toBe(200);
   expect(await res.json()).toStrictEqual({ projects: [] });
 });
+
+test("a waiting session is reported with state waiting", async () => {
+  const res = await get(
+    handler(
+      createStubAgentSource([
+        makeSession({
+          sessionId: "w1",
+          projectId: "/a/.git",
+          projectName: "a",
+          cwd: "/a",
+          state: "waiting",
+          stateSince: T("10:00:01"),
+        }),
+      ]),
+    ),
+  );
+  const body = (await res.json()) as {
+    projects: { sessions: { sessionId: string; state: string }[] }[];
+  };
+  expect(body.projects[0]!.sessions).toHaveLength(1);
+  expect(body.projects[0]!.sessions[0]!.state).toBe("waiting");
+});

@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { addWorktree, commitAll, makeGitRepo } from "./git-helpers";
 import { cleanupFixtures } from "./helpers";
+import { materializeAttention, scenarioLines } from "./attention-fixtures";
 import { materializeTranscripts } from "./transcript-fixtures";
 import pkg from "../package.json" with { type: "json" };
 
@@ -152,6 +153,7 @@ test("successful start prints the startup lines and serves health", async () => 
     repoPath: repoDir,
     repoName: "demo-repo",
     version: pkg.version,
+    attentionHook: { seen: false, lastEventAt: null },
   });
   child.kill("SIGKILL");
 });
@@ -432,6 +434,59 @@ test("GET /api/sessions lists the two-worktrees sessions as one project, working
     expect(sessions[0]!.sessionId.startsWith("77777777")).toBe(true);
     expect(sessions[0]!.state).toBe("working");
     expect(sessions[1]!.state).toBe("standby");
+  } finally {
+    child.kill("SIGINT");
+    await child.exited;
+  }
+});
+
+test("GET /api/sessions shows a session with a pending permission request as waiting", async () => {
+  const repo = await makeGitRepo();
+  await commitAll(repo, "init");
+  const { dir } = await materializeAttention("permission-main", { REPO: repo });
+  // Fixture times are in 2026; shift them to just before now, keeping their order.
+  const lines = scenarioLines(dir);
+  const base = Date.parse(lines[0]!.ts);
+  const start = Date.now() - 10_000;
+  const shift = (text: string, ts: string) => {
+    const moved = new Date(start + (Date.parse(ts) - base)).toISOString();
+    return text.replace(ts, moved);
+  };
+  const transcriptFile = lines.find((l) =>
+    l.file.endsWith("a0050000-0000-0000-0000-000000000001.jsonl"),
+  )!.file;
+  const transcriptText = lines
+    .filter((l) => l.file === transcriptFile && l.ts <= "2026-10-15T10:00:01.000Z")
+    .map((l) => shift(l.text, l.ts))
+    .join("\n");
+  const request = lines.find((l) => l.text.includes('"PermissionRequest"'))!;
+  const projectsDir = path.join(tmp, "att-transcripts", "-repo");
+  fs.mkdirSync(projectsDir, { recursive: true });
+  fs.writeFileSync(path.join(projectsDir, path.basename(transcriptFile)), `${transcriptText}\n`);
+  const hooksDir = path.join(stateDir, "hooks");
+  fs.mkdirSync(hooksDir, { recursive: true });
+  fs.writeFileSync(path.join(hooksDir, "events.jsonl"), `${shift(request.text, request.ts)}\n`);
+
+  const port = await freePort();
+  const { child } = await startAndWait([repoDir, "--port", String(port)], {
+    AGENT_VISUALIZER_TRANSCRIPTS_DIR: path.join(tmp, "att-transcripts"),
+  });
+  try {
+    let state: string | undefined;
+    let sessionId: string | undefined;
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline) {
+      const body = (await (await fetch(`http://127.0.0.1:${port}/api/sessions`)).json()) as {
+        projects: { sessions: { sessionId: string; state: string }[] }[];
+      };
+      const s = body.projects[0]?.sessions[0];
+      state = s?.state;
+      sessionId = s?.sessionId;
+      if (state === "waiting") break;
+      await Bun.sleep(50);
+    }
+    expect(sessionId).toBe("a0050000-0000-0000-0000-000000000001");
+    expect(state).toBe("waiting");
   } finally {
     child.kill("SIGINT");
     await child.exited;

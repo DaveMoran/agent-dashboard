@@ -1,0 +1,4 @@
+{"ts":"2026-10-15T10:00:09.000Z","session":"a0050000-0000-0000-0000-000000000006","cwd":"{{REPO}}","event":"Stop"}
+{"ts":"2026-10-15T10:00:08.000Z","session":"a0050000-0000-0000-0000-000000000006","cwd":"{{REPO}}","event":"PermissionRequest","type":"Bash"}
+{"ts":"2026-10-15T10:00:05.000Z","session":"a0050000-0000-0000-0000-000000000007","cwd":"{{REPO}}","event":"PermissionRequest","type":"Bash"}
+{"ts":"2026-10-15T10:00:01.000Z","session":"a0050000-0000-0000-0000-000000000007","cwd":"{{REPO}}","event":"UserPromptSubmit"}

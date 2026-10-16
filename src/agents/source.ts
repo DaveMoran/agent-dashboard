@@ -25,7 +25,8 @@ export type AgentSourceEvent =
       to: SessionState;
       at: string;
       session: AgentSession;
-    };
+    }
+  | { type: "session-ended"; sessionId: string; projectId: string; at: string };
 
 export interface IngestIssue {
   file: string;
