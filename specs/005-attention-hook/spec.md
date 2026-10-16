@@ -79,7 +79,7 @@ A developer who has not installed the hook, or who removes it, sees exactly the 
 
 1. **Given** no events file exists, **When** the visualizer runs, **Then** all session states equal those of the transcript source alone, no session is ever `waiting`, and no error or issue is reported.
 2. **Given** the events file appears while the visualizer runs (the developer installs the hook), **When** the next events are written, **Then** they are picked up without a restart.
-3. **Given** the events file is removed, truncated or replaced (for example by the hook rotating it), **When** it is next read, **Then** reading continues from the start of the new file without errors, and waits already recorded stay until something ends them.
+3. **Given** the events file is removed, truncated or replaced (for example the developer deletes it), **When** it is next read, **Then** reading continues from the start of the new file without errors, and waits already recorded stay until something ends them.
 
 ---
 
@@ -133,7 +133,7 @@ After installing the hook, the developer wants to know whether the visualizer is
 - **FR-001**: The project MUST ship a hook script that the user can reference from their own user-level Claude Code settings. The visualizer MUST NOT install, write or edit any Claude Code hook or settings file.
 - **FR-002**: For each hook invocation, the script MUST append exactly one line to the events file in the visualizer's state directory (the same directory as the rest of the visualizer's state, including its environment-variable override), containing only: the time it ran, the session ID, the working directory, the hook event name and the event type (the notification type, or the tool name for tool events). It MUST NOT record prompt text, notification messages, tool input or any other content.
 - **FR-003**: The hook script MUST exit successfully and write nothing to standard output or standard error in every case, including invalid input and an unwritable state directory, so it never adds context, blocks, or answers anything in Claude Code. It MUST create the state directory and events file if missing.
-- **FR-004**: The hook script MUST write each line with a single append so that concurrent hooks never interleave lines, and MUST keep the events file bounded by moving it aside to a single backup when it exceeds a size limit (default 10 MB).
+- **FR-004**: The hook script MUST write each line with a single append so that concurrent hooks never interleave lines.
 - **FR-005**: The project MUST research and record, in its design documents, which Claude Code hook events (and which notification types or tool matchers) mean "started waiting for the user", which mean "done waiting", and which mean "session ended", covering at least: permission prompts, questions the agent asks the user (including plan approval), prompt submission, turn stop and session end. The documented settings MUST subscribe to exactly the events in that mapping.
 - **FR-006**: The system MUST provide a hook-backed agent source that reads the events file incrementally with the same rules as transcripts (remember the position, read only appended content, hold back an incomplete line, start again when the file is shorter or replaced), and that treats a missing events file as no events, without error, picking it up when it appears.
 - **FR-007**: The system MUST combine the hook-backed source with the transcript source into one agent source that consumers use in place of the transcript source, without changes to consumers beyond handling the new `waiting` state and session end.
@@ -146,7 +146,7 @@ After installing the hook, the developer wants to know whether the visualizer is
 - **FR-014**: The sessions endpoint and its shared contract MUST include `waiting` as a session state; sessions that have ended MUST NOT be listed.
 - **FR-015**: The health endpoint MUST report whether any attention hook event has been read and the timestamp of the most recent one.
 - **FR-016**: With no events file, every session's state MUST equal what the transcript source alone reports, and no session is ever `waiting`.
-- **FR-017**: The documentation MUST show the exact settings snippet to add to user-level Claude Code settings, where the hook script and events file live, how to check that events are arriving, and how to remove the hook; and MUST state that the visualizer never edits these settings itself.
+- **FR-017**: The documentation MUST show the exact settings snippet to add to user-level Claude Code settings, where the hook script and events file live, how to check that events are arriving, how to remove the hook, and that the events file can be deleted at any time; and MUST state that the visualizer never edits these settings itself.
 - **FR-018**: Tests MUST be fixture-driven, using recorded transcripts and a recorded events file under `fixtures/`, and MUST cover at least: a permission wait ended by a tool result; a question wait ended by the answer; a wait ended by an interruption; a wait raised by a subagent and ended in its transcript; waiting with background subagents running; a tool result read before its waiting event (out of order); events in the file out of timestamp order; an event for a session that appears later; a session end and a resumed session; malformed hook lines; no events file; and the hook script itself (output line, silence, exit status, unwritable directory).
 
 ### Key Entities *(include if feature involves data)*
@@ -176,6 +176,7 @@ After installing the hook, the developer wants to know whether the visualizer is
 - A hook fired inside a subagent reports the parent (main) session's ID, so a subagent's permission prompt makes its main session wait. Research confirms this; if not, subagent waits are matched to their parent through the transcript source.
 - The hook script runs with tools already present on the developer's machine (the same runtime the visualizer uses); no extra software is installed.
 - "Waiting" means the agent is blocked mid-turn on the user (a permission prompt or a question). Claude Code's "idle" notification, sent some time after a turn has already ended, does not make a session `waiting`: that session is on standby, its turn is done.
+- The events file is not rotated or trimmed. A line is about 200 bytes and the hook fires only on a few events per turn, so growth is slow; the developer can delete the file at any time. Bounding it is revisited only if size becomes a problem in practice.
 - Session end comes only from the hook. Without the hook, sessions are never ended this way; 006's idle timeout decides when they stop counting.
 - What the session is waiting for (which tool, which question) is not shown in V1; only the fact that it is waiting. Exposing the reason (for example for the hardware's "what is it waiting on") is later work.
 - The server still starts with a repo path, as in 004; starting without one comes in 006.
