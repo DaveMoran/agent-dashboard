@@ -328,7 +328,7 @@ description: "Task list for 005-attention-hook"
 
 **Independent Test**: `tests/attention-source.test.ts` with `session-end`.
 
-- [ ] T016 [US5] (tester → coder) Session end and revival (FR-012, research R8). Test file: `tests/attention-source.test.ts`. Code: `src/agents/attention/source.ts`.
+- [X] T016 [US5] (tester → coder) Session end and revival (FR-012, research R8). Test file: `tests/attention-source.test.ts`. Code: `src/agents/attention/source.ts`.
   - A session whose `isEnded(record, base.clears(id))` is true is left out of `sessions()`.
   - On the change to ended, emit `{ type: "session-ended", sessionId, projectId, at: record.endAt }` once, and drop base events for it while ended.
   - When it stops being ended, emit `session-added` with the combined session.

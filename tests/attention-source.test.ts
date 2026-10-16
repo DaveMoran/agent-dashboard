@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, w
 import path from "node:path";
 import { compileMainAgentPattern } from "../src/agents/main-agent";
 import type { AgentSourceEvent } from "../src/agents/source";
+import { buildSessionsResponse } from "../src/server/sessions";
 import { createAttentionSource } from "../src/agents/attention/source";
 import { createTranscriptSource } from "../src/agents/transcripts/source";
 import { emptyCopy, materializeAttention, scenarioLines } from "./attention-fixtures";
@@ -564,4 +565,105 @@ test("T015 deleting the events file raises no issue and keeps the recorded wait"
   expect(attention.issues()).toStrictEqual(base.issues());
   expect(stateOf(attention)).toBe("waiting");
   expect(attention.hookStatus()).toStrictEqual({ seen: true, lastEventAt: T("10:00:02.000") });
+});
+
+// --- T016: session end and revival (FR-012, research R8, contract guarantees 10-11) ---
+
+const S08 = sid("08");
+const S09 = sid("09");
+const ofSession = (e: AgentSourceEvent, id: string) => {
+  if (e.type === "session-ended") return e.sessionId === id;
+  if (e.type === "session-added" || e.type === "session-updated" || e.type === "state-changed") {
+    return e.session.sessionId === id;
+  }
+  return false;
+};
+
+test("S08 ends once at the SessionEnd time and stays out of sessions() after the bookkeeping line; S09 stays standby", async () => {
+  const { attention, events, lines, feed } = await prepare("session-end", S08);
+  const listed: { ts: string; listed: boolean; evCount: number }[] = [];
+  for (const l of lines) {
+    await feed(l);
+    listed.push({
+      ts: l.ts,
+      listed: attention.sessions().some((s) => s.sessionId === S08),
+      evCount: events.length,
+    });
+  }
+  const added = events.find((e) => e.type === "session-added" && e.session.sessionId === S08);
+  expect(added).toBeDefined();
+  const projectId = (added as Extract<AgentSourceEvent, { type: "session-added" }>).session.projectId;
+
+  const ended = events.filter((e) => e.type === "session-ended" && e.sessionId === S08);
+  expect(ended).toStrictEqual([{ type: "session-ended", sessionId: S08, projectId, at: T("10:00:10.000") }]);
+
+  // Listed before the end, absent from the end on, including after the 10:00:12 bookkeeping line.
+  expect(listed.find((x) => x.ts === T("10:00:01.500"))!.listed).toBe(true);
+  expect(listed.find((x) => x.ts === T("10:00:10.000"))!.listed).toBe(false);
+  const last = listed[listed.length - 1]!;
+  expect(last.ts).toBe(T("10:00:12.000"));
+  expect(last.listed).toBe(false);
+  expect(attention.sessions().some((s) => s.sessionId === S08)).toBe(false);
+
+  // Nothing about S08 after the session-ended event.
+  const endIdx = events.findIndex((e) => e.type === "session-ended" && e.sessionId === S08);
+  expect(events.slice(endIdx + 1).filter((e) => ofSession(e, S08))).toStrictEqual([]);
+
+  // S09 (timestamp order): its SessionEnd (10:00:03) is read before its final turn (10:00:05),
+  // so it really is ended for a moment, then the turn revives it as standby.
+  const s09Events = events.filter((e) => ofSession(e, S09));
+  const s09End = s09Events.filter((e) => e.type === "session-ended");
+  expect(s09End).toStrictEqual([{ type: "session-ended", sessionId: S09, projectId, at: T("10:00:03.000") }]);
+  const endAt = s09Events.findIndex((e) => e.type === "session-ended");
+  const revived = s09Events.slice(endAt + 1).filter((e) => e.type === "session-added");
+  expect(revived.length).toBe(1);
+  expect((revived[0] as Extract<AgentSourceEvent, { type: "session-added" }>).session.state).toBe("standby");
+  const s09 = attention.sessions().find((s) => s.sessionId === S09)!;
+  expect(s09.state).toBe("standby");
+});
+
+test("a prompt appended to the ended S08 revives it with session-added in state working; /api/sessions follows", async () => {
+  const { attention, events, lines, feed } = await replay("session-end", S08);
+  const base = buildSessionsResponse(attention.sessions());
+  expect(base.projects.flatMap((p) => p.sessions.map((s) => s.sessionId))).toStrictEqual([S09]);
+
+  const userLine = lines.find(
+    (l) => !isEventsLine(l) && l.file.endsWith(`${S08}.jsonl`) && l.text.includes('"type":"user"'),
+  )!;
+  const prompt = JSON.stringify({
+    ...JSON.parse(userLine.text),
+    timestamp: T("10:05:00.000"),
+    message: { role: "user", content: "Back again" },
+  });
+  const before = events.length;
+  await feed({ file: userLine.file, text: prompt, ts: T("10:05:00.000") });
+
+  const revived = events.slice(before).filter((e) => e.type === "session-added");
+  expect(revived.length).toBe(1);
+  const r = revived[0] as Extract<AgentSourceEvent, { type: "session-added" }>;
+  expect(r.session.sessionId).toBe(S08);
+  expect(r.session.state).toBe("working");
+  expect(events.slice(before).filter((e) => e.type === "session-ended")).toStrictEqual([]);
+
+  const live = attention.sessions().find((s) => s.sessionId === S08)!;
+  expect(live.state).toBe("working");
+  const resp = buildSessionsResponse(attention.sessions());
+  expect(resp.projects.flatMap((p) => p.sessions.map((s) => s.sessionId)).sort()).toStrictEqual([S08, S09]);
+});
+
+test("session-end: S08 ends and S09 is standby in every read order; S09 only ends when its end is read before its last turn", async () => {
+  for (const order of ORDERS) {
+    const { projected, events } = await replayOrdered("session-end", order);
+    expect(projected).toStrictEqual([{ sessionId: S09, state: "standby", runningSubagents: 0 }]);
+    expect(
+      events.filter((e) => e.type === "session-ended" && e.sessionId === S08).length,
+    ).toBeLessThanOrEqual(1);
+    const endIdx = events.findIndex((e) => e.type === "session-ended" && e.sessionId === S08);
+    if (endIdx >= 0) expect(events.slice(endIdx + 1).filter((e) => ofSession(e, S08))).toStrictEqual([]);
+    const s09Ended = events.filter((e) => e.type === "session-ended" && e.sessionId === S09);
+    expect(s09Ended.length).toBe(order === "ts" ? 1 : 0);
+    if (order === "events-first") {
+      expect(events.filter((e) => e.type === "session-added" && e.session.sessionId === S09).length).toBe(1);
+    }
+  }
 });

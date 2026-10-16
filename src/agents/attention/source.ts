@@ -3,7 +3,14 @@ import type { SessionState } from "../../contract/sessions";
 import type { AgentSession, AgentSource, AgentSourceEvent, IngestIssue } from "../source";
 import { FileTail } from "../transcripts/tail";
 import type { createTranscriptSource } from "../transcripts/source";
-import { type AttentionRecord, applyHookEvent, combinedState, emptyRecord, waitSince } from "./combine";
+import {
+  type AttentionRecord,
+  applyHookEvent,
+  combinedState,
+  emptyRecord,
+  isEnded,
+  waitSince,
+} from "./combine";
 import { classifyHookLine } from "./hook-line";
 
 export interface AttentionSourceOptions {
@@ -38,6 +45,7 @@ export function createAttentionSource(options: AttentionSourceOptions): AgentSou
   const tail = new FileTail(eventsFile);
   const records = new Map<string, AttentionRecord>();
   const reported = new Map<string, Reported>();
+  const endedIds = new Set<string>();
   const ownIssues: IngestIssue[] = [];
   const listeners = new Set<(event: AgentSourceEvent) => void>();
   let seen = false;
@@ -72,9 +80,38 @@ export function createAttentionSource(options: AttentionSourceOptions): AgentSou
     return { ...session, state: c.state, stateSince: c.since };
   }
 
+  function isEndedNow(id: string): boolean {
+    const record = records.get(id);
+    return record !== undefined && isEnded(record, base.clears(id));
+  }
+
+  // Returns true while the session is ended (callers then stay silent).
+  function syncEnd(session: AgentSession): boolean {
+    const id = session.sessionId;
+    const record = records.get(id);
+    if (record !== undefined && isEndedNow(id)) {
+      if (!endedIds.has(id)) {
+        endedIds.add(id);
+        if (reported.has(id)) {
+          reported.delete(id);
+          emit({ type: "session-ended", sessionId: id, projectId: session.projectId, at: record.endAt! });
+        }
+      }
+      return true;
+    }
+    if (endedIds.delete(id)) {
+      reported.delete(id);
+      const v = view(session);
+      reported.set(id, { state: v.state, since: v.stateSince });
+      emit({ type: "session-added", session: v });
+    }
+    return false;
+  }
+
   function recompute(sessionId: string, at: string): void {
     const session = baseSession(sessionId);
     if (session === undefined) return;
+    if (syncEnd(session)) return;
     const last = reported.get(sessionId);
     const c = combine(session);
     if (last === undefined) {
@@ -97,12 +134,14 @@ export function createAttentionSource(options: AttentionSourceOptions): AgentSou
   function onBaseEvent(event: AgentSourceEvent): void {
     switch (event.type) {
       case "session-added": {
+        if (syncEnd(event.session)) return;
         const v = view(event.session);
         reported.set(event.session.sessionId, { state: v.state, since: v.stateSince });
         emit({ type: "session-added", session: v });
         return;
       }
       case "session-updated":
+        if (endedIds.has(event.session.sessionId)) return;
         emit({ type: "session-updated", session: view(event.session) });
         return;
       case "state-changed":
@@ -110,6 +149,7 @@ export function createAttentionSource(options: AttentionSourceOptions): AgentSou
         return;
       case "session-ended":
         reported.delete(event.sessionId);
+        if (endedIds.delete(event.sessionId)) return;
         emit(event);
         return;
     }
@@ -190,6 +230,7 @@ export function createAttentionSource(options: AttentionSourceOptions): AgentSou
       ];
       await base.start();
       for (const s of base.sessions()) {
+        if (syncEnd(s)) continue;
         if (!reported.has(s.sessionId)) {
           const v = view(s);
           reported.set(s.sessionId, { state: v.state, since: v.stateSince });
@@ -213,7 +254,11 @@ export function createAttentionSource(options: AttentionSourceOptions): AgentSou
       if (inflight !== undefined) await inflight.catch(() => {});
       await base.stop();
     },
-    sessions: () => base.sessions().map(view),
+    sessions: () =>
+      base
+        .sessions()
+        .filter((s) => !isEndedNow(s.sessionId))
+        .map(view),
     subscribe(listener) {
       listeners.add(listener);
       return () => {
