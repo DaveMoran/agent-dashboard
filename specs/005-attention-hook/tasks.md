@@ -369,7 +369,7 @@ description: "Task list for 005-attention-hook"
   - `README.md`, "Project structure": `hooks/`, `src/agents/attention/`, `src/contract/health.ts`, `scripts/hook-settings.ts`.
   - `docs/master-spec.md`: the hook event mapping table (research R1), the per-agent wait rule (FR-008), and the sync/async split (R3).
   - Check every command in the README runs as written.
-- [ ] T019 (planner) Run `bun run verify` and `bun run build`. Then do the quickstart section 3 live dogfood check:
+- [X] T019 (planner) Run `bun run verify` and `bun run build`. Then do the quickstart section 3 live dogfood check:
   - install the hook from `bun run hook-settings` into the user's own settings, with the user's go-ahead (the user edits or approves the edit);
   - check permission, `AskUserQuestion`, a background-subagent permission while another subagent works, idle stays `standby`, `/exit` removes the session and resuming brings it back;
   - check `events.jsonl` holds no prompt text.
