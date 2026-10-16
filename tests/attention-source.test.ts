@@ -249,3 +249,108 @@ test("replaying scenarios leaves fixtures/attention byte-identical", async () =>
   await replay("subagent-wait", sid("04"));
   expect(hashTree(dir)).toStrictEqual(before);
 });
+
+// --- T011: read order independence (FR-010, SC-002) ---
+
+type Order = "ts" | "transcripts-first" | "events-first";
+const ORDERS: Order[] = ["ts", "transcripts-first", "events-first"];
+
+const isEventsLine = (l: { file: string }) => path.basename(l.file) === "events.jsonl";
+
+async function replayOrdered(scenario: string, order: Order) {
+  const REPO = await makeGitRepo();
+  const m = await materializeAttention(scenario, { REPO });
+  const all = scenarioLines(m.dir);
+  emptyCopy(m.dir);
+  const ordered =
+    order === "ts"
+      ? all
+      : order === "transcripts-first"
+        ? [...all.filter((l) => !isEventsLine(l)), ...all.filter(isEventsLine)]
+        : [...all.filter(isEventsLine), ...all.filter((l) => !isEventsLine(l))];
+  const base = createTranscriptSource({
+    root: m.transcriptsRoot,
+    mainAgentPattern: pattern,
+    pollIntervalMs: 0,
+  });
+  const attention = createAttentionSource({
+    base,
+    eventsFile: m.eventsFile,
+    pollIntervalMs: 0,
+    now: () => NOW,
+  });
+  started.push(attention);
+  const events: AgentSourceEvent[] = [];
+  attention.subscribe((e) => events.push(e));
+  await attention.start();
+  for (const l of ordered) {
+    appendLine(l.file, l.text);
+    await base.refresh();
+    await attention.refresh();
+  }
+  const sessions = attention.sessions();
+  const projected = sessions
+    .map((s) => ({ sessionId: s.sessionId, state: s.state, runningSubagents: s.runningSubagents }))
+    .sort((a, b) => (a.sessionId < b.sessionId ? -1 : a.sessionId > b.sessionId ? 1 : 0));
+  return { events, projected, sessions };
+}
+
+const ORDER_CASES: {
+  scenario: string;
+  expected: { nn: string; state: "working" | "standby" | "waiting"; running: number }[] | null;
+}[] = [
+  { scenario: "permission-main", expected: [{ nn: "01", state: "standby", running: 0 }] },
+  { scenario: "question-main", expected: [{ nn: "02", state: "standby", running: 0 }] },
+  { scenario: "interrupted-wait", expected: [{ nn: "03", state: "standby", running: 0 }] },
+  { scenario: "subagent-wait", expected: [{ nn: "04", state: "standby", running: 0 }] },
+  { scenario: "main-wait-bg-subagent", expected: [{ nn: "05", state: "working", running: 1 }] },
+  {
+    scenario: "unsorted-events",
+    expected: [
+      { nn: "06", state: "working", running: 0 },
+      { nn: "07", state: "waiting", running: 0 },
+    ],
+  },
+  // session end is T016: only agreement between orders is pinned here.
+  { scenario: "session-end", expected: null },
+];
+
+for (const c of ORDER_CASES) {
+  test(`${c.scenario}: ts, transcripts-first and events-first reach the same final sessions`, async () => {
+    const results = [];
+    for (const order of ORDERS) results.push(await replayOrdered(c.scenario, order));
+    const [a, b, d] = results;
+    expect(b!.projected).toStrictEqual(a!.projected);
+    expect(d!.projected).toStrictEqual(a!.projected);
+    if (c.expected) {
+      expect(a!.projected).toStrictEqual(
+        c.expected.map((e) => ({ sessionId: sid(e.nn), state: e.state, runningSubagents: e.running })),
+      );
+    } else {
+      expect(a!.projected.length).toBeGreaterThan(0);
+    }
+  });
+}
+
+test("transcripts-first: S01, S02 and S03 never emit a change to waiting", async () => {
+  for (const [scenario, nn] of [
+    ["permission-main", "01"],
+    ["question-main", "02"],
+    ["interrupted-wait", "03"],
+  ] as const) {
+    const { events } = await replayOrdered(scenario, "transcripts-first");
+    const waits = changes(events).filter((e) => e.to === "waiting" && e.sessionId === sid(nn));
+    expect(waits).toStrictEqual([]);
+  }
+});
+
+test("unsorted-events: S07 is waiting since 10:00:05 and S06 is not waiting, in every order", async () => {
+  for (const order of ORDERS) {
+    const { sessions } = await replayOrdered("unsorted-events", order);
+    const s7 = sessions.find((s) => s.sessionId === sid("07"))!;
+    const s6 = sessions.find((s) => s.sessionId === sid("06"))!;
+    expect(s7.state).toBe("waiting");
+    expect(s7.stateSince).toBe(T("10:00:05.000"));
+    expect(s6.state).not.toBe("waiting");
+  }
+});

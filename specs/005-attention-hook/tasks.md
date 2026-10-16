@@ -255,7 +255,7 @@ description: "Task list for 005-attention-hook"
 
 **Independent Test**: `tests/attention-source.test.ts` read-order tests.
 
-- [ ] T011 [US2] (tester → coder) Read-order tests (FR-010, SC-002). Test file: `tests/attention-source.test.ts`. Code: fix `src/agents/attention/source.ts` or `src/agents/attention/combine.ts` only if a test fails.
+- [X] T011 [US2] (tester → coder) Read-order tests (FR-010, SC-002). Test file: `tests/attention-source.test.ts`. Code: fix `src/agents/attention/source.ts` or `src/agents/attention/combine.ts` only if a test fails.
   - Replay scenarios 1–7 under three orders:
     - `ts`: timestamp order, one line at a time;
     - `transcripts-first`: all transcript lines, then all event lines;
