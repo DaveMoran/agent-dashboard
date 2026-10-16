@@ -1,5 +1,5 @@
 // Types for GET /api/sessions. This file must import nothing.
-export type SessionState = "working" | "standby"; // 005 adds "waiting"
+export type SessionState = "working" | "standby" | "waiting";
 
 export interface SessionView {
   sessionId: string;

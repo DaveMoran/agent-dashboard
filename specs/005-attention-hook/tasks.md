@@ -39,7 +39,7 @@ description: "Task list for 005-attention-hook"
 
 ## Phase 1: Setup
 
-- [ ] T001 (planner) Run `git branch --show-current` (expect `005-attention-hook`) and `bun run verify` (expect all existing tests to pass) to confirm a green baseline. No commit.
+- [X] T001 (planner) Run `git branch --show-current` (expect `005-attention-hook`) and `bun run verify` (expect all existing tests to pass) to confirm a green baseline. No commit.
 
 ---
 
@@ -47,7 +47,7 @@ description: "Task list for 005-attention-hook"
 
 **Purpose**: contract and interface types, the reducer's `lastTurnAt`, the transcript source's `clears()` and `onActivity()`, and the attention fixtures.
 
-- [ ] T002 [P] (coder) In `src/contract/sessions.ts` change `SessionState` to `"working" | "standby" | "waiting"` (remove the "005 adds" comment). Create `src/contract/health.ts` exactly as in `contracts/http-api.md`: `export interface HealthResponse { status: "ok"; repoPath: string; repoName: string; version: string; attentionHook: { seen: boolean; lastEventAt: string | null } }`. Types only, no imports. `tests/contract-boundary.test.ts` already scans every file under `src/contract/`; it must still pass.
+- [X] T002 [P] (coder) In `src/contract/sessions.ts` change `SessionState` to `"working" | "standby" | "waiting"` (remove the "005 adds" comment). Create `src/contract/health.ts` exactly as in `contracts/http-api.md`: `export interface HealthResponse { status: "ok"; repoPath: string; repoName: string; version: string; attentionHook: { seen: boolean; lastEventAt: string | null } }`. Types only, no imports. `tests/contract-boundary.test.ts` already scans every file under `src/contract/`; it must still pass.
 - [ ] T003 [P] (coder) In `src/agents/source.ts` add the variant `{ type: "session-ended"; sessionId: string; projectId: string; at: string }` to `AgentSourceEvent` (`contracts/agent-source.md`). Fix any exhaustive `switch` that no longer type-checks (none is expected; `bun run verify` must pass).
 - [ ] T004 [P] (tester → coder) Reducer `lastTurnAt` (research R4). Test file: `tests/session-state.test.ts` (add tests). Code: `src/agents/transcripts/session-state.ts`.
   - Add `lastTurnAt: string | undefined` to `SessionStateT`. It is `undefined` in `initialSessionState()`.
