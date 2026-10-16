@@ -316,7 +316,7 @@ description: "Task list for 005-attention-hook"
 
 **Independent Test**: `tests/attention-source.test.ts` no-file and replaced-file tests.
 
-- [ ] T015 [US4] (tester → coder) Missing, appearing and replaced events files (FR-006, FR-016, research R9). Test file: `tests/attention-source.test.ts`. Code: fix `src/agents/attention/source.ts` only if a test fails.
+- [X] T015 [US4] (tester → coder) Missing, appearing and replaced events files (FR-006, FR-016, research R9). Test file: `tests/attention-source.test.ts`. Code: fix `src/agents/attention/source.ts` only if a test fails.
   - For each 004 scenario in `fixtures/transcripts/` (materialized as in `tests/transcript-source.test.ts`) and no events file: the attention source's `sessions()` deep-equals the transcript source's, every emitted event deep-equals the base's in the same order, `issues()` equals the base's, and `hookStatus()` is `{ seen: false, lastEventAt: null }` (US4 scenario 1, SC-005).
   - Creating the events file with `permission-main`'s event after start, then `refresh()`, makes S01 `waiting` (scenario 2).
   - Replacing the file with a shorter one that has only a `UserPromptSubmit` line for another session, then `refresh()`, raises no issue and leaves S01 `waiting` (scenario 3).

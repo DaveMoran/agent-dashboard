@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, renameSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { compileMainAgentPattern } from "../src/agents/main-agent";
 import type { AgentSourceEvent } from "../src/agents/source";
@@ -9,7 +9,7 @@ import { createTranscriptSource } from "../src/agents/transcripts/source";
 import { emptyCopy, materializeAttention, scenarioLines } from "./attention-fixtures";
 import { makeGitRepo } from "./git-helpers";
 import { FIXTURES, cleanupFixtures } from "./helpers";
-import { appendLine } from "./transcript-fixtures";
+import { appendLine, materializeTranscripts } from "./transcript-fixtures";
 
 type Attention = ReturnType<typeof createAttentionSource>;
 
@@ -442,4 +442,126 @@ test("T012 a held wait whose tool result is already in the moved transcript is n
   await move();
   const s = attention.sessions().find((x) => x.sessionId === S10)!;
   expect(s.state).not.toBe("waiting");
+});
+
+// --- T015: missing, appearing and replaced events files (FR-006, FR-016, research R9) ---
+
+const TRANSCRIPT_SCENARIOS = readdirSync(path.join(FIXTURES, "transcripts"))
+  .filter((n) => !n.startsWith("_") && !n.endsWith(".md"))
+  .sort();
+
+async function noFileRun(scenario: string) {
+  const REPO = await makeGitRepo();
+  const PLAIN = await makeGitRepo();
+  const dirs = { REPO, WORKTREE: `${REPO}-wt`, PLAIN, MISSING: `${PLAIN}/gone` };
+  const root = await materializeTranscripts(scenario, dirs);
+  const base = createTranscriptSource({ root, mainAgentPattern: pattern, pollIntervalMs: 0 });
+  const eventsFile = path.join(path.dirname(root), "no-hooks", "events.jsonl");
+  const attention = createAttentionSource({ base, eventsFile, pollIntervalMs: 0, now: () => NOW });
+  started.push(attention);
+  const baseEvents: AgentSourceEvent[] = [];
+  const attEvents: AgentSourceEvent[] = [];
+  base.subscribe((e) => baseEvents.push(e));
+  attention.subscribe((e) => attEvents.push(e));
+  await attention.start();
+  await base.refresh();
+  await attention.refresh();
+  return { base, attention, baseEvents, attEvents, eventsFile };
+}
+
+test("T015 there is at least one 004 transcript scenario to compare", () => {
+  expect(TRANSCRIPT_SCENARIOS).toContain("plain-turn");
+  expect(TRANSCRIPT_SCENARIOS).toContain("background-subagents");
+});
+
+for (const scenario of TRANSCRIPT_SCENARIOS) {
+  test(`T015 no events file: ${scenario} behaves exactly like the transcript source (US4 scenario 1, SC-005)`, async () => {
+    const { base, attention, baseEvents, attEvents, eventsFile } = await noFileRun(scenario);
+    expect(existsSync(eventsFile)).toBe(false);
+    expect(base.sessions().length).toBeGreaterThan(0);
+    expect(attention.sessions()).toStrictEqual(base.sessions());
+    expect(baseEvents.length).toBeGreaterThan(0);
+    expect(attEvents).toStrictEqual(baseEvents);
+    expect(attention.issues()).toStrictEqual(base.issues());
+    expect(attention.hookStatus()).toStrictEqual({ seen: false, lastEventAt: null });
+    expect(existsSync(eventsFile)).toBe(false);
+  });
+}
+
+async function permissionRun() {
+  const REPO = await makeGitRepo();
+  const m = await materializeAttention("permission-main", { REPO });
+  const lines = scenarioLines(m.dir);
+  emptyCopy(m.dir);
+  const eventLine = lines.find(isEventsLine)!.text;
+  const transcriptLines = lines.filter((l) => !isEventsLine(l));
+  rmSync(m.eventsFile);
+  const base = createTranscriptSource({
+    root: m.transcriptsRoot,
+    mainAgentPattern: pattern,
+    pollIntervalMs: 0,
+  });
+  const attention = createAttentionSource({
+    base,
+    eventsFile: m.eventsFile,
+    pollIntervalMs: 0,
+    now: () => NOW,
+  });
+  started.push(attention);
+  await attention.start();
+  // user prompt, assistant tool_use for the permission-gated tool
+  for (const l of transcriptLines.slice(0, 2)) {
+    appendLine(l.file, l.text);
+    await base.refresh();
+    await attention.refresh();
+  }
+  return { base, attention, m, eventLine };
+}
+
+const stateOf = (a: Attention) => a.sessions().find((s) => s.sessionId === sid("01"))?.state;
+
+test("T015 an events file created after start takes effect on the next refresh (US4 scenario 2)", async () => {
+  const { attention, m, eventLine } = await permissionRun();
+  expect(stateOf(attention)).toBe("working");
+  expect(attention.hookStatus()).toStrictEqual({ seen: false, lastEventAt: null });
+  mkdirSync(path.dirname(m.eventsFile), { recursive: true });
+  writeFileSync(m.eventsFile, `${eventLine}\n`);
+  await attention.refresh();
+  expect(stateOf(attention)).toBe("waiting");
+  expect(attention.sessions().find((s) => s.sessionId === sid("01"))!.stateSince).toBe(T("10:00:02.000"));
+  expect(attention.hookStatus()).toStrictEqual({ seen: true, lastEventAt: T("10:00:02.000") });
+  expect(attention.issues()).toStrictEqual([]);
+});
+
+test("T015 a replaced, shorter events file raises no issue and keeps the recorded wait (US4 scenario 3)", async () => {
+  const { base, attention, m, eventLine } = await permissionRun();
+  writeFileSync(m.eventsFile, `${eventLine}\n`);
+  await attention.refresh();
+  expect(stateOf(attention)).toBe("waiting");
+  const replacement = `${JSON.stringify({
+    ts: T("10:00:03.000"),
+    session: sid("09"),
+    event: "UserPromptSubmit",
+  })}\n`;
+  expect(replacement.length).toBeLessThan(eventLine.length + 1);
+  writeFileSync(m.eventsFile, replacement);
+  await attention.refresh();
+  expect(attention.issues()).toStrictEqual([]);
+  expect(attention.issues()).toStrictEqual(base.issues());
+  expect(stateOf(attention)).toBe("waiting");
+  expect(attention.sessions().find((s) => s.sessionId === sid("01"))!.stateSince).toBe(T("10:00:02.000"));
+  expect(attention.hookStatus().seen).toBe(true);
+});
+
+test("T015 deleting the events file raises no issue and keeps the recorded wait", async () => {
+  const { base, attention, m, eventLine } = await permissionRun();
+  writeFileSync(m.eventsFile, `${eventLine}\n`);
+  await attention.refresh();
+  expect(stateOf(attention)).toBe("waiting");
+  rmSync(m.eventsFile);
+  await attention.refresh();
+  expect(attention.issues()).toStrictEqual([]);
+  expect(attention.issues()).toStrictEqual(base.issues());
+  expect(stateOf(attention)).toBe("waiting");
+  expect(attention.hookStatus()).toStrictEqual({ seen: true, lastEventAt: T("10:00:02.000") });
 });

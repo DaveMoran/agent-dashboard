@@ -134,11 +134,8 @@ export function createAttentionSource(options: AttentionSourceOptions): AgentSou
       });
       return;
     }
-    if (result.reset) {
-      records.clear();
-      seen = false;
-      lastEventAt = null;
-    }
+    // On reset the new file is folded in from the start on top of existing
+    // records; waits are maxima over timestamps so re-reading is harmless (R9).
     for (const line of result.lines) {
       const r = classifyHookLine(line.text);
       if ("issue" in r) {
