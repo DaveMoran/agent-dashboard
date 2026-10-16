@@ -80,7 +80,16 @@ describe("speckit adapter across worktrees", () => {
     const snap = await scanRoots(await resolveRoots(repo));
     const issue = snap.issues.find((i) => i.kind === "unreadable-path");
     expect(issue?.message).toContain(d);
-    expect(snap.specs.map((s) => s.id)).toStrictEqual(["001", "002", "003", "004", "005", "006", "007", "008"]);
+    expect(snap.specs.map((s) => s.id)).toStrictEqual([
+      "001",
+      "002",
+      "003",
+      "004",
+      "005",
+      "006",
+      "007",
+      "008",
+    ]);
   });
 
   test("a single worktree has itself as the only root", async () => {

@@ -138,10 +138,7 @@ describe("watchSpecs", () => {
     const root = await copyFixture("stub/repo-a");
     const s = await startSettled([root]);
     s.drain();
-    await writeFile(
-      spec(root, "005.json"),
-      JSON.stringify({ id: "005", title: "Fifth", status: "drafted" }),
-    );
+    await writeFile(spec(root, "005.json"), JSON.stringify({ id: "005", title: "Fifth", status: "drafted" }));
     const n = await s.next(2000);
     expect(n.type).toBe("spec-changed");
     expect(s.watcher.current().specs.map((x) => x.id)).toEqual(["001", "002", "003", "005"]);
@@ -164,10 +161,7 @@ describe("watchSpecs", () => {
     await sleep(300);
     s.drain();
 
-    await writeFile(
-      spec(root, "003.json"),
-      JSON.stringify({ id: "003", title: "Fixed", status: "ready" }),
-    );
+    await writeFile(spec(root, "003.json"), JSON.stringify({ id: "003", title: "Fixed", status: "ready" }));
     const ok = await s.next(2000);
     expect(ok.type).toBe("spec-changed");
     expect(s.watcher.current().specs.find((x) => x.id === "003")!.title).toBe("Fixed");

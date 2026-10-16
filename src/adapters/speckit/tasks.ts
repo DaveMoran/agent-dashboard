@@ -42,7 +42,10 @@ export function parseTasks(tasksMd: string): Task[] {
       else kept.push(token[0]);
       rest = rest.slice(token[0].length).trimStart();
     }
-    const text = [...kept, rest].filter((s) => s !== "").join(" ").trim();
+    const text = [...kept, rest]
+      .filter((s) => s !== "")
+      .join(" ")
+      .trim();
 
     const task: Task = { id: m[2]!, text, done: m[1] !== " " };
     if (phase !== undefined) task.phase = phase;

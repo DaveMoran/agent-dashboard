@@ -43,9 +43,7 @@ export async function listSessionFiles(root: string): Promise<string[]> {
 }
 
 /** Subagent transcripts of a session: `<stem>/subagents/agent-<id>.jsonl`, sorted by id. */
-export async function listSubagentFiles(
-  sessionFile: string,
-): Promise<{ agentId: string; path: string }[]> {
+export async function listSubagentFiles(sessionFile: string): Promise<{ agentId: string; path: string }[]> {
   const dir = path.join(sessionFile.replace(/\.jsonl$/, ""), "subagents");
   const out: { agentId: string; path: string }[] = [];
   for (const name of await names(dir)) {

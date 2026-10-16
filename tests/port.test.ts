@@ -1,8 +1,7 @@
 import { expect, test } from "bun:test";
 import { listenWithFallback } from "../src/server/port.js";
 
-const listen = (port: number) =>
-  Bun.serve({ port, hostname: "127.0.0.1", fetch: () => new Response("x") });
+const listen = (port: number) => Bun.serve({ port, hostname: "127.0.0.1", fetch: () => new Response("x") });
 
 test("falls back to a different free port when the requested one is taken", () => {
   const occupier = listen(0);

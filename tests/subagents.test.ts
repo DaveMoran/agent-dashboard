@@ -6,9 +6,14 @@ import { combineState, isSubagentRunning } from "../src/agents/transcripts/subag
 const j = (o: unknown) => JSON.stringify(o);
 const u = (t: string, content: unknown = "go") => j({ type: "user", timestamp: t, message: { content } });
 const call = (t: string, id: string) =>
-  j({ type: "assistant", timestamp: t, message: { stop_reason: "tool_use", content: [{ type: "tool_use", id }] } });
+  j({
+    type: "assistant",
+    timestamp: t,
+    message: { stop_reason: "tool_use", content: [{ type: "tool_use", id }] },
+  });
 const result = (t: string, id: string) => u(t, [{ type: "tool_result", tool_use_id: id }]);
-const final = (t: string) => j({ type: "assistant", timestamp: t, message: { stop_reason: "end_turn", content: [] } });
+const final = (t: string) =>
+  j({ type: "assistant", timestamp: t, message: { stop_reason: "end_turn", content: [] } });
 const turnEnd = (t: string) => j({ type: "system", subtype: "turn_duration", timestamp: t });
 const notif = (t: string, id: string) =>
   u(t, `<task-notification>\n<task-id>${id}</task-id>\n<status>killed</status>\n</task-notification>`);
@@ -51,10 +56,17 @@ test("combineState truth table", () => {
 test("scenario 6 in memory", () => {
   const parent = fold([
     u(T(1)),
-    call(T(2), "c1"), call(T(2), "c2"), call(T(2), "c3"),
-    result(T(3), "c1"), result(T(3), "c2"), result(T(3), "c3"),
-    final(T(4)), turnEnd(T(4)),
-    notif(T(8), "b"), final(T(8)), turnEnd(T(8)),
+    call(T(2), "c1"),
+    call(T(2), "c2"),
+    call(T(2), "c3"),
+    result(T(3), "c1"),
+    result(T(3), "c2"),
+    result(T(3), "c3"),
+    final(T(4)),
+    turnEnd(T(4)),
+    notif(T(8), "b"),
+    final(T(8)),
+    turnEnd(T(8)),
   ]);
   expect(parent.state).toBe("standby");
   const subs: Record<string, SessionStateT> = {

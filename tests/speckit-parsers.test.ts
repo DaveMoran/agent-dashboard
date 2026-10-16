@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
 import { pickAuthoritative } from "../src/adapters/speckit/authority";
-import { groupFeatureFiles, parseFeatureDirName, type FeatureCopy } from "../src/adapters/speckit/feature-dir";
+import {
+  groupFeatureFiles,
+  parseFeatureDirName,
+  type FeatureCopy,
+} from "../src/adapters/speckit/feature-dir";
 import { deriveStatus } from "../src/adapters/speckit/status";
 import { parseTasks } from "../src/adapters/speckit/tasks";
 import { parseTitle } from "../src/adapters/speckit/title";
@@ -27,8 +31,16 @@ describe("parseTasks", () => {
   });
 
   test("keeps story tokens and drops [P] in any order", () => {
-    expect(parseTasks("## Phase 2: Foundational\n- [x] T003 [P] [US1] Create the config loader")).toStrictEqual([
-      { id: "T003", text: "[US1] Create the config loader", done: true, parallel: true, phase: "Phase 2: Foundational" },
+    expect(
+      parseTasks("## Phase 2: Foundational\n- [x] T003 [P] [US1] Create the config loader"),
+    ).toStrictEqual([
+      {
+        id: "T003",
+        text: "[US1] Create the config loader",
+        done: true,
+        parallel: true,
+        phase: "Phase 2: Foundational",
+      },
     ]);
   });
 

@@ -15,12 +15,7 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value !== "";
 }
 
-function stringList(
-  value: unknown,
-  field: string,
-  specId: string,
-  issues: Issue[],
-): string[] {
+function stringList(value: unknown, field: string, specId: string, issues: Issue[]): string[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) {
     issues.push({
@@ -96,11 +91,7 @@ function normalizeTasks(value: unknown, specId: string, issues: Issue[]): Task[]
   return tasks;
 }
 
-function normalizeSource(
-  value: unknown,
-  specId: string,
-  issues: Issue[],
-): SpecSource | undefined {
+function normalizeSource(value: unknown, specId: string, issues: Issue[]): SpecSource | undefined {
   if (value === undefined) return undefined;
   if (isRecord(value) && typeof value.root === "string") {
     const source: SpecSource = { root: value.root };

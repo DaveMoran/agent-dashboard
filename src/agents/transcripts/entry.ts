@@ -104,8 +104,12 @@ export function classifyLine(line: string): ClassifyResult {
       return make("prompt", { completedAgentIds: completedIds(text) });
     }
     if (OTHER_PREFIXES.some((p) => text.startsWith(p))) return make("other");
-    if (typeof content === "string" ? content.length > 0 : Array.isArray(content) &&
-        content.some((b) => isObj(b) && (b["type"] === "text" || b["type"] === "image"))) {
+    if (
+      typeof content === "string"
+        ? content.length > 0
+        : Array.isArray(content) &&
+          content.some((b) => isObj(b) && (b["type"] === "text" || b["type"] === "image"))
+    ) {
       return make("prompt");
     }
     return make("other");
@@ -135,7 +139,11 @@ export function classifyLine(line: string): ClassifyResult {
   if (type === "attachment") {
     const att = isObj(parsed["attachment"]) ? parsed["attachment"] : undefined;
     const prompt = str(att?.["prompt"]);
-    if (att?.["type"] === "queued_command" && prompt !== undefined && prompt.startsWith("<task-notification>")) {
+    if (
+      att?.["type"] === "queued_command" &&
+      prompt !== undefined &&
+      prompt.startsWith("<task-notification>")
+    ) {
       return make("other", { completedAgentIds: completedIds(prompt) });
     }
     return make("other");

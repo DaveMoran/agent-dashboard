@@ -6,10 +6,19 @@ const j = (o: unknown) => JSON.stringify(o);
 const u = (t: string, content: unknown = "go", extra: object = {}) =>
   j({ type: "user", timestamp: t, sessionId: "s1", cwd: "/r", message: { content }, ...extra });
 const call = (t: string, id: string) =>
-  j({ type: "assistant", timestamp: t, sessionId: "s1", message: { model: "claude-opus-5-5", stop_reason: "tool_use", content: [{ type: "tool_use", id }] } });
+  j({
+    type: "assistant",
+    timestamp: t,
+    sessionId: "s1",
+    message: { model: "claude-opus-5-5", stop_reason: "tool_use", content: [{ type: "tool_use", id }] },
+  });
 const result = (t: string, id: string) => u(t, [{ type: "tool_result", tool_use_id: id }]);
 const final = (t: string) =>
-  j({ type: "assistant", timestamp: t, message: { model: "claude-opus-5-5", stop_reason: "end_turn", content: [{ type: "text", text: "ok" }] } });
+  j({
+    type: "assistant",
+    timestamp: t,
+    message: { model: "claude-opus-5-5", stop_reason: "end_turn", content: [{ type: "text", text: "ok" }] },
+  });
 
 function fold(lines: string[]): SessionStateT {
   let s = initialSessionState();
@@ -25,9 +34,15 @@ const T = (n: number) => `2026-10-15T10:00:0${n}.000Z`;
 
 test("initial state is standby and empty", () => {
   expect(initialSessionState()).toStrictEqual({
-    sessionId: undefined, model: undefined, cwd: undefined, state: "standby",
-    stateSince: undefined, lastActivity: undefined, openToolUseIds: [],
-    completedAgentIds: {}, ended: false,
+    sessionId: undefined,
+    model: undefined,
+    cwd: undefined,
+    state: "standby",
+    stateSince: undefined,
+    lastActivity: undefined,
+    openToolUseIds: [],
+    completedAgentIds: {},
+    ended: false,
   });
 });
 
@@ -71,7 +86,11 @@ test("scenario 5: foreground subagent call stays working until final", () => {
 });
 
 test("scenario 8: interrupt after open call is standby and clears open ids", () => {
-  const s = fold([u(T(1)), call(T(2), "t1"), u(T(3), [{ type: "text", text: "[Request interrupted by user]" }])]);
+  const s = fold([
+    u(T(1)),
+    call(T(2), "t1"),
+    u(T(3), [{ type: "text", text: "[Request interrupted by user]" }]),
+  ]);
   expect(s.state).toBe("standby");
   expect(s.stateSince).toBe(T(3));
   expect(s.openToolUseIds).toStrictEqual([]);
@@ -132,9 +151,18 @@ test("applyEntry does not mutate its input", () => {
   expect(JSON.stringify(frozen)).toBe(before);
 });
 
-const sessionEnd = (t: string) => j({ type: "continued-in", timestamp: t, sessionId: "s1", continuedInSessionId: "s2" });
+const sessionEnd = (t: string) =>
+  j({ type: "continued-in", timestamp: t, sessionId: "s1", continuedInSessionId: "s2" });
 const queuedNote = (t: string, id: string) =>
-  j({ type: "attachment", timestamp: t, sessionId: "s1", attachment: { type: "queued_command", prompt: `<task-notification>\n<task-id>${id}</task-id>\n<status>completed</status>\n</task-notification>` } });
+  j({
+    type: "attachment",
+    timestamp: t,
+    sessionId: "s1",
+    attachment: {
+      type: "queued_command",
+      prompt: `<task-notification>\n<task-id>${id}</task-id>\n<status>completed</status>\n</task-notification>`,
+    },
+  });
 
 test("session-end after a prompt gives standby and ended; a later prompt resumes", () => {
   const s = fold([u(T(1)), call(T(2), "x"), sessionEnd(T(3))]);

@@ -52,9 +52,7 @@ describe("scan", () => {
   });
 
   test("two roots combine, with source.root identifying each", async () => {
-    const snap = await okSnapshot(
-      await scan(createStubAdapter(), { roots: [repoA, repoB] }),
-    );
+    const snap = await okSnapshot(await scan(createStubAdapter(), { roots: [repoA, repoB] }));
     expect(snap.specs.map((s) => s.id).sort()).toEqual(["001", "002", "003", "004"]);
     expect(snap.specs.find((s) => s.id === "004")!.source).toEqual({ root: repoB });
     expect(snap.specs.find((s) => s.id === "001")!.source).toEqual({ root: repoA });
@@ -62,9 +60,7 @@ describe("scan", () => {
 
   test("the same unreadable root listed twice is reported once", async () => {
     const missing = path.join(FIXTURES, "stub", "does-not-exist");
-    const snap = await okSnapshot(
-      await scan(createStubAdapter(), { roots: [missing, missing] }),
-    );
+    const snap = await okSnapshot(await scan(createStubAdapter(), { roots: [missing, missing] }));
     expect(snap.issues).toHaveLength(1);
     expect(snap.issues[0]!.kind).toBe("unreadable-path");
   });

@@ -70,10 +70,7 @@ async function readUntil(stream: ReadableStream<Uint8Array>, marker: string, tim
   while (!lineDone()) {
     const remaining = deadline - Date.now();
     if (remaining <= 0) throw new Error(`Timed out waiting for "${marker}"; got: ${text}`);
-    const result = await Promise.race([
-      reader.read(),
-      Bun.sleep(remaining).then(() => "timeout" as const),
-    ]);
+    const result = await Promise.race([reader.read(), Bun.sleep(remaining).then(() => "timeout" as const)]);
     if (result === "timeout" || result.done) {
       throw new Error(`Stream ended before "${marker}"; got: ${text}`);
     }
@@ -281,7 +278,9 @@ test("a stale record (dead pid) is replaced on start", async () => {
 function snapshot(root: string): string[] {
   const out: string[] = [];
   const walk = (dir: string) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const entry of fs
+      .readdirSync(dir, { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name))) {
       const full = path.join(dir, entry.name);
       const stat = fs.lstatSync(full);
       out.push(`${path.relative(root, full)}\t${entry.isDirectory() ? "dir" : stat.size}\t${stat.mtimeMs}`);
@@ -385,9 +384,7 @@ test("non-string adapter in config exits 1 with the invalid-config message", asy
   const { code, stdout, stderr } = await run([repoDir]);
   expect(code).toBe(1);
   expect(stdout).toBe("");
-  expect(stderr).toContain(
-    `Invalid config in ${file}: "adapter" must be a non-empty string, got 5`,
-  );
+  expect(stderr).toContain(`Invalid config in ${file}: "adapter" must be a non-empty string, got 5`);
 });
 
 test("a config without an adapter key still prints exactly the startup lines", async () => {
@@ -451,10 +448,7 @@ test("an invalid mainAgentModel warns on stderr and the server still starts", as
   } finally {
     child.kill("SIGINT");
   }
-  const [stderr] = await Promise.all([
-    new Response(child.stderr as ReadableStream).text(),
-    child.exited,
-  ]);
+  const [stderr] = await Promise.all([new Response(child.stderr as ReadableStream).text(), child.exited]);
   expect(stderr).toContain("mainAgentModel");
 });
 

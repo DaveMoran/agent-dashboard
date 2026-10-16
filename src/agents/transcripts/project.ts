@@ -15,9 +15,7 @@ export function projectNameFromCommonDir(commonDir: string): string {
 }
 
 /** Resolve a cwd to its project (shared by all worktrees); one git call per distinct cwd. */
-export function createProjectResolver(
-  run: typeof runGit = runGit,
-): (cwd: string) => Promise<ProjectRef> {
+export function createProjectResolver(run: typeof runGit = runGit): (cwd: string) => Promise<ProjectRef> {
   const cache = new Map<string, Promise<ProjectRef>>();
   async function resolve(cwd: string): Promise<ProjectRef> {
     const result = await run(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);

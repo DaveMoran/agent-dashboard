@@ -28,9 +28,7 @@ export interface WatchOptions {
 }
 
 function inIgnoredDir(rel: string): boolean {
-  return rel
-    .split(path.sep)
-    .some((segment) => segment === ".git" || segment === "node_modules");
+  return rel.split(path.sep).some((segment) => segment === ".git" || segment === "node_modules");
 }
 
 function isDirectory(abs: string): boolean {

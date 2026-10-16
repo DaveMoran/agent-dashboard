@@ -6,9 +6,30 @@ const T = (t: string) => `2026-10-15T${t}.000Z`;
 
 test("groups main sessions by project and sorts sessions and projects", () => {
   const res = buildSessionsResponse([
-    makeSession({ sessionId: "a1", projectId: "/a/.git", projectName: "a", cwd: "/a", lastActivity: T("10:00:00") }),
-    makeSession({ sessionId: "b1", projectId: "/b/.git", projectName: "b", cwd: "/b", lastActivity: T("10:05:00"), state: "working", runningSubagents: 2, stateSince: T("10:04:00") }),
-    makeSession({ sessionId: "a2", projectId: "/a/.git", projectName: "a", cwd: "/a/wt", lastActivity: T("10:03:00") }),
+    makeSession({
+      sessionId: "a1",
+      projectId: "/a/.git",
+      projectName: "a",
+      cwd: "/a",
+      lastActivity: T("10:00:00"),
+    }),
+    makeSession({
+      sessionId: "b1",
+      projectId: "/b/.git",
+      projectName: "b",
+      cwd: "/b",
+      lastActivity: T("10:05:00"),
+      state: "working",
+      runningSubagents: 2,
+      stateSince: T("10:04:00"),
+    }),
+    makeSession({
+      sessionId: "a2",
+      projectId: "/a/.git",
+      projectName: "a",
+      cwd: "/a/wt",
+      lastActivity: T("10:03:00"),
+    }),
   ]);
   expect(res).toStrictEqual({
     projects: [
@@ -17,7 +38,15 @@ test("groups main sessions by project and sorts sessions and projects", () => {
         name: "b",
         lastActivity: T("10:05:00"),
         sessions: [
-          { sessionId: "b1", model: "claude-opus-5-5", cwd: "/b", state: "working", runningSubagents: 2, stateSince: T("10:04:00"), lastActivity: T("10:05:00") },
+          {
+            sessionId: "b1",
+            model: "claude-opus-5-5",
+            cwd: "/b",
+            state: "working",
+            runningSubagents: 2,
+            stateSince: T("10:04:00"),
+            lastActivity: T("10:05:00"),
+          },
         ],
       },
       {
@@ -25,8 +54,24 @@ test("groups main sessions by project and sorts sessions and projects", () => {
         name: "a",
         lastActivity: T("10:03:00"),
         sessions: [
-          { sessionId: "a2", model: "claude-opus-5-5", cwd: "/a/wt", state: "standby", runningSubagents: 0, stateSince: null, lastActivity: T("10:03:00") },
-          { sessionId: "a1", model: "claude-opus-5-5", cwd: "/a", state: "standby", runningSubagents: 0, stateSince: null, lastActivity: T("10:00:00") },
+          {
+            sessionId: "a2",
+            model: "claude-opus-5-5",
+            cwd: "/a/wt",
+            state: "standby",
+            runningSubagents: 0,
+            stateSince: null,
+            lastActivity: T("10:03:00"),
+          },
+          {
+            sessionId: "a1",
+            model: "claude-opus-5-5",
+            cwd: "/a",
+            state: "standby",
+            runningSubagents: 0,
+            stateSince: null,
+            lastActivity: T("10:00:00"),
+          },
         ],
       },
     ],
@@ -72,8 +117,20 @@ function handler(source?: ReturnType<typeof createStubAgentSource>) {
 const get = (h: ReturnType<typeof handler>) => h(new Request("http://x/api/sessions"));
 
 const twoProjects = () => [
-  makeSession({ sessionId: "a1", projectId: "/a/.git", projectName: "a", cwd: "/a", lastActivity: T("10:00:00") }),
-  makeSession({ sessionId: "b1", projectId: "/b/.git", projectName: "b", cwd: "/b", lastActivity: T("10:05:00") }),
+  makeSession({
+    sessionId: "a1",
+    projectId: "/a/.git",
+    projectName: "a",
+    cwd: "/a",
+    lastActivity: T("10:00:00"),
+  }),
+  makeSession({
+    sessionId: "b1",
+    projectId: "/b/.git",
+    projectName: "b",
+    cwd: "/b",
+    lastActivity: T("10:05:00"),
+  }),
 ];
 
 test("GET /api/sessions returns the built response as JSON", async () => {
@@ -93,7 +150,14 @@ test("the next request reflects changed sessions", async () => {
   const first = (await (await get(h)).json()) as { projects: { sessions: { state: string }[] }[] };
   expect(first.projects[0]!.sessions[0]!.state).toBe("standby");
   source.setSessions([
-    makeSession({ sessionId: "b1", projectId: "/b/.git", projectName: "b", cwd: "/b", state: "working", lastActivity: T("10:06:00") }),
+    makeSession({
+      sessionId: "b1",
+      projectId: "/b/.git",
+      projectName: "b",
+      cwd: "/b",
+      state: "working",
+      lastActivity: T("10:06:00"),
+    }),
   ]);
   const second = (await (await get(h)).json()) as {
     projects: { sessions: { state: string }[] }[];

@@ -47,10 +47,7 @@ export function emptySnapshot(adapter: string | null = null): Snapshot {
   return { specs: [], issues: [], adapter, scannedAt: new Date().toISOString() };
 }
 
-export async function scan(
-  adapter: Adapter | null,
-  ctx: RepoContext,
-): Promise<ScanResult> {
+export async function scan(adapter: Adapter | null, ctx: RepoContext): Promise<ScanResult> {
   if (adapter === null) {
     return { ok: true, snapshot: emptySnapshot(null) };
   }

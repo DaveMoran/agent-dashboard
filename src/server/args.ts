@@ -38,17 +38,17 @@ export function parseCliArgs(argv: string[]): CliOptions {
       args: argv,
       options: {
         port: {
-          type: "string"
+          type: "string",
         },
         help: {
-          type: "boolean"
+          type: "boolean",
         },
         version: {
-          type: "boolean"
-        }
+          type: "boolean",
+        },
       },
       allowPositionals: true,
-      strict: true
+      strict: true,
     });
 
     const { port } = values;
@@ -93,7 +93,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
       repoPath,
       port: validatedPort,
       help,
-      version
+      version,
     };
   } catch (error) {
     if (error instanceof UsageError) {

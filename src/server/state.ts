@@ -26,7 +26,10 @@ export function stateRoot(): string {
 }
 
 export function repoKey(repoPath: string): string {
-  const slug = path.basename(repoPath).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const slug = path
+    .basename(repoPath)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
   const hash = createHash("sha1").update(repoPath).digest("hex").slice(0, 8);
   return `${slug}-${hash}`;
 }

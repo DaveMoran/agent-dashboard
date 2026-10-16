@@ -10,7 +10,11 @@ const ROOT = path.join(FIXTURES, "transcripts");
 
 function walk(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? walk(path.join(dir, e.name)) : e.name.endsWith(".jsonl") ? [path.join(dir, e.name)] : [],
+    e.isDirectory()
+      ? walk(path.join(dir, e.name))
+      : e.name.endsWith(".jsonl")
+        ? [path.join(dir, e.name)]
+        : [],
   );
 }
 
@@ -94,8 +98,12 @@ test("background-subagents: turn standby, one running subagent, combined working
   expect(subs["a0000000000000001"]!.state).toBe("standby");
   expect(subs["a0000000000000002"]!.state).toBe("working");
   expect(subs["a0000000000000003"]!.state).toBe("working");
-  expect(Date.parse(subs["a0000000000000002"]!.lastActivity!)).toBeLessThan(Date.parse(parent.completedAgentIds["a0000000000000002"]!));
-  expect(Date.parse(subs["a0000000000000003"]!.lastActivity!)).toBeLessThan(Date.parse(parent.completedAgentIds["a0000000000000002"]!));
+  expect(Date.parse(subs["a0000000000000002"]!.lastActivity!)).toBeLessThan(
+    Date.parse(parent.completedAgentIds["a0000000000000002"]!),
+  );
+  expect(Date.parse(subs["a0000000000000003"]!.lastActivity!)).toBeLessThan(
+    Date.parse(parent.completedAgentIds["a0000000000000002"]!),
+  );
   expect(running(s, sid)).toEqual(["a0000000000000003"]);
   expect(combineState(parent.state, running(s, sid).length)).toBe("working");
 });
@@ -133,7 +141,9 @@ test("malformed: three issues, standby at the end_turn line, partial last line i
 });
 
 test("timestamps strictly increase within every fixture file", () => {
-  for (const name of readdirSync(ROOT, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith("_")).map((e) => e.name)) {
+  for (const name of readdirSync(ROOT, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !e.name.startsWith("_"))
+    .map((e) => e.name)) {
     for (const file of walk(path.join(ROOT, name))) {
       let prev = 0;
       for (const line of readFileSync(file, "utf8").split("\n")) {

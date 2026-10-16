@@ -61,21 +61,36 @@ async function setup(
 
 function files(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? files(path.join(dir, e.name)) : e.name.endsWith(".jsonl") ? [path.join(dir, e.name)] : [],
+    e.isDirectory()
+      ? files(path.join(dir, e.name))
+      : e.name.endsWith(".jsonl")
+        ? [path.join(dir, e.name)]
+        : [],
   );
 }
 const fileOf = (root: string, name: string) => files(root).find((f) => f.endsWith(name))!;
 const bySession = (env: Env, sid: string) => env.source.sessions().find((s) => s.sessionId === sid)!;
 
 const prompt = (sid: string, cwd: string, at: string) =>
-  JSON.stringify({ type: "user", timestamp: T(at), sessionId: sid, cwd, message: { role: "user", content: "More" } });
+  JSON.stringify({
+    type: "user",
+    timestamp: T(at),
+    sessionId: sid,
+    cwd,
+    message: { role: "user", content: "More" },
+  });
 const final = (sid: string, cwd: string, at: string) =>
   JSON.stringify({
     type: "assistant",
     timestamp: T(at),
     sessionId: sid,
     cwd,
-    message: { id: "x", model: "claude-opus-5-5", stop_reason: "end_turn", content: [{ type: "text", text: "ok" }] },
+    message: {
+      id: "x",
+      model: "claude-opus-5-5",
+      stop_reason: "end_turn",
+      content: [{ type: "text", text: "ok" }],
+    },
   });
 const other = (sid: string, cwd: string, at: string) =>
   JSON.stringify({ type: "file-history-snapshot", timestamp: T(at), sessionId: sid, cwd });
@@ -104,11 +119,31 @@ test("plain-turn gives the full expected session", async () => {
 
 test("each scenario gives its documented state, subagents, main flag and activity", async () => {
   const table: [string, string, Partial<AgentSession>][] = [
-    ["tool-calls", id("2"), { state: "working", runningSubagents: 0, isMain: true, lastActivity: T("10:01:01") }],
-    ["foreground-subagent", id("3"), { state: "working", runningSubagents: 1, isMain: true, lastActivity: T("10:00:04") }],
-    ["background-subagents", id("4"), { state: "working", runningSubagents: 1, isMain: true, lastActivity: T("10:02:06") }],
-    ["interrupted", id("5"), { state: "standby", runningSubagents: 0, isMain: true, lastActivity: T("10:00:03") }],
-    ["two-worktrees", id("8"), { state: "standby", runningSubagents: 0, isMain: true, lastActivity: T("10:02:00") }],
+    [
+      "tool-calls",
+      id("2"),
+      { state: "working", runningSubagents: 0, isMain: true, lastActivity: T("10:01:01") },
+    ],
+    [
+      "foreground-subagent",
+      id("3"),
+      { state: "working", runningSubagents: 1, isMain: true, lastActivity: T("10:00:04") },
+    ],
+    [
+      "background-subagents",
+      id("4"),
+      { state: "working", runningSubagents: 1, isMain: true, lastActivity: T("10:02:06") },
+    ],
+    [
+      "interrupted",
+      id("5"),
+      { state: "standby", runningSubagents: 0, isMain: true, lastActivity: T("10:00:03") },
+    ],
+    [
+      "two-worktrees",
+      id("8"),
+      { state: "standby", runningSubagents: 0, isMain: true, lastActivity: T("10:02:00") },
+    ],
   ];
   for (const [scenario, sid, expected] of table) {
     const env = await setup(scenario);
@@ -123,7 +158,12 @@ test("two-worktrees: both sessions share one projectId", async () => {
   expect(all.map((s) => s.cwd).sort()).toEqual([env.REPO, env.WORKTREE].sort());
   expect(all[0]!.projectId).toBe(path.join(env.REPO, ".git"));
   expect(all[1]!.projectId).toBe(all[0]!.projectId);
-  expect(bySession(env, id("7"))).toMatchObject({ state: "working", isMain: true, model: "claude-opus-5-5", lastActivity: T("10:05:00") });
+  expect(bySession(env, id("7"))).toMatchObject({
+    state: "working",
+    isMain: true,
+    model: "claude-opus-5-5",
+    lastActivity: T("10:05:00"),
+  });
 });
 
 test("non-main: sessions are not main and the project is outside git", async () => {
@@ -229,7 +269,13 @@ test("background subagents: finishing one standbys the session, resuming works i
   expect(changes[0]).toMatchObject({ from: "working", to: "standby", at: T("10:30:00") });
   expect(changes[0]!.session.runningSubagents).toBe(0);
 
-  appendLine(sub, line("10:31:00", { stop_reason: "tool_use", content: [{ type: "tool_use", id: "r1", name: "Read", input: {} }] }));
+  appendLine(
+    sub,
+    line("10:31:00", {
+      stop_reason: "tool_use",
+      content: [{ type: "tool_use", id: "r1", name: "Read", input: {} }],
+    }),
+  );
   env.events.length = 0;
   await env.source.refresh();
   changes = stateChanges(env.events);
@@ -262,7 +308,12 @@ test("new session files and new project folders appear after refresh", async () 
   writeFileSync(path.join(folder, `${sid}.jsonl`), prompt(sid, env.PLAIN, "12:00:00") + "\n");
   env.events.length = 0;
   await env.source.refresh();
-  expect(env.source.sessions().map((s) => s.sessionId).sort()).toEqual([id("1"), sid].sort());
+  expect(
+    env.source
+      .sessions()
+      .map((s) => s.sessionId)
+      .sort(),
+  ).toEqual([id("1"), sid].sort());
   expect(env.events.filter((e) => e.type === "session-added")).toHaveLength(1);
 });
 

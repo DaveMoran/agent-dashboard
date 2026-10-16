@@ -32,7 +32,16 @@ describe("speckit adapter on the fixture repo", () => {
   test("finds every feature directory with a spec.md", async () => {
     const snap = await scanOk(await copyFixture("speckit/repo"));
     expect(snap.adapter).toBe("speckit");
-    expect(snap.specs.map((s) => s.id)).toStrictEqual(["001", "002", "003", "004", "005", "006", "007", "008"]);
+    expect(snap.specs.map((s) => s.id)).toStrictEqual([
+      "001",
+      "002",
+      "003",
+      "004",
+      "005",
+      "006",
+      "007",
+      "008",
+    ]);
   });
 
   test("derives each status from files alone", async () => {

@@ -176,9 +176,7 @@ describe("validateSpecs: combinations", () => {
     // bad-status is the only excluded-by-status spec; the rest stay.
     const ids = result.snapshot.specs.map((s) => s.id);
     expect(ids).not.toContain("BS");
-    expect(ids).toEqual(
-      expect.arrayContaining(["BT", "CA", "CB", "CC", "D", "DT", "S", "T", "UN"]),
-    );
+    expect(ids).toEqual(expect.arrayContaining(["BT", "CA", "CB", "CC", "D", "DT", "S", "T", "UN"]));
   });
 
   test("repo-a's valid specs produce zero issues", async () => {

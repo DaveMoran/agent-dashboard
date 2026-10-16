@@ -1,12 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
 import { createStubAdapter } from "../fixtures/stub/adapter";
-import {
-  assertKnownAdapter,
-  createRegistry,
-  selectAdapter,
-  UnknownAdapterError,
-} from "../src/core/registry";
+import { assertKnownAdapter, createRegistry, selectAdapter, UnknownAdapterError } from "../src/core/registry";
 import { FIXTURES } from "./helpers";
 
 const ctx = { roots: [path.join(FIXTURES, "stub", "repo-a")] };
@@ -23,10 +18,7 @@ describe("registry", () => {
   });
 
   test("with two matches the first registered wins, every time", async () => {
-    const reg = createRegistry([
-      createStubAdapter({ name: "first" }),
-      createStubAdapter({ name: "second" }),
-    ]);
+    const reg = createRegistry([createStubAdapter({ name: "first" }), createStubAdapter({ name: "second" })]);
     for (let i = 0; i < 10; i++) {
       const sel = await selectAdapter(reg, ctx);
       expect(sel.adapter?.name).toBe("first");
@@ -48,10 +40,7 @@ describe("registry", () => {
   });
 
   test("forced adapter is selected even when another matches first", async () => {
-    const reg = createRegistry([
-      createStubAdapter({ name: "first" }),
-      createStubAdapter({ name: "second" }),
-    ]);
+    const reg = createRegistry([createStubAdapter({ name: "first" }), createStubAdapter({ name: "second" })]);
     const sel = await selectAdapter(reg, ctx, "second");
     expect(sel.adapter?.name).toBe("second");
     expect(sel.forced).toBe(true);
@@ -71,10 +60,7 @@ describe("registry", () => {
   });
 
   test("forced unknown name throws UnknownAdapterError listing names", async () => {
-    const reg = createRegistry([
-      createStubAdapter({ name: "alpha" }),
-      createStubAdapter({ name: "beta" }),
-    ]);
+    const reg = createRegistry([createStubAdapter({ name: "alpha" }), createStubAdapter({ name: "beta" })]);
     const err = await selectAdapter(reg, ctx, "nope").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(UnknownAdapterError);
     expect((err as UnknownAdapterError).message).toBe(
