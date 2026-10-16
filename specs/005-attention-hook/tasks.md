@@ -356,7 +356,7 @@ description: "Task list for 005-attention-hook"
 
 ## Phase 9: Polish, Documentation and PR
 
-- [ ] T018 (coder) Documentation (Principle II, FR-017).
+- [X] T018 (coder) Documentation (Principle II, FR-017).
   - `README.md`, new section "Attention hook (optional)":
     - what it does (red/`waiting` for permission prompts, questions, plan approval);
     - that the visualizer never edits your settings;
