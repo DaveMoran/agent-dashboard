@@ -281,7 +281,7 @@ description: "Task list for 005-attention-hook"
 
 **Independent Test**: `tests/hook-script.test.ts` and `tests/hook-settings.test.ts`.
 
-- [ ] T013 [P] [US3] (tester → coder) The hook script per `contracts/hook-events.md` and research R3. Test file: `tests/hook-script.test.ts`. Code: `hooks/attention-hook.ts`.
+- [X] T013 [P] [US3] (tester → coder) The hook script per `contracts/hook-events.md` and research R3. Test file: `tests/hook-script.test.ts`. Code: `hooks/attention-hook.ts`.
   - The script reads all of stdin, builds `{ ts, session, cwd?, event, type?, agent? }` (`type` from the first present of `notification_type`, `tool_name`, `reason`), creates `<root>/hooks` with `{ recursive: true, mode: 0o700 }`, and appends `JSON.stringify(line) + "\n"` with one `appendFileSync`.
   - `<root>` is `process.env.AGENT_VISUALIZER_STATE_DIR || path.join(os.homedir(), ".agent-visualizer")`.
   - The whole body is in `try/catch`. It never writes to stdout or stderr and always exits 0.
