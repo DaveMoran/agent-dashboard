@@ -216,7 +216,7 @@ description: "Task list for 005-attention-hook"
   - applying the same events in reversed order gives a deep-equal record (FR-010);
   - `isEnded` false when a later turn or a later hook event exists;
   - the input record is not mutated.
-- [ ] T009 [US1] (tester → coder) The attention source per `contracts/agent-source.md`. Test file: `tests/attention-source.test.ts`. Code: `src/agents/attention/source.ts`.
+- [X] T009 [US1] (tester → coder) The attention source per `contracts/agent-source.md`. Test file: `tests/attention-source.test.ts`. Code: `src/agents/attention/source.ts`.
   - Factory: `createAttentionSource({ base, eventsFile, pollIntervalMs = 500, holdMs = 600_000, now = Date.now })`, returning `AgentSource & { refresh(): Promise<void>; hookStatus(): HookStatus }` (export `HookStatus`).
   - **Reading**: tail `eventsFile` with `FileTail` from `src/agents/transcripts/tail.ts`. A missing file means no lines and no issue. Classify each line with `classifyHookLine` and fold it into a per-session `AttentionRecord` with `applyHookEvent`. Classification issues become `IngestIssue`s (`file` = `eventsFile`, `offset` = the line's offset, `detail` = `field`).
   - **Recomputing**: after each events pass, recompute every session whose record changed. On each `base.onActivity(id)`, recompute `id`.
@@ -230,9 +230,10 @@ description: "Task list for 005-attention-hook"
     - Build a real transcript source (`createTranscriptSource` with `pollIntervalMs: 0` and the materialized `transcriptsRoot`) and an attention source over it with `pollIntervalMs: 0` and `now: () => Date.parse("2026-10-15T10:01:00.000Z")`. Fixture times are in the past, so the default `Date.now` would trip the hold timeout.
     - Use `emptyCopy` and replay `scenarioLines` in timestamp order with `appendLine`, calling `base.refresh()` then `attention.refresh()` after each line.
     - Assert the exact sequence of `state-changed` `(to, at)` pairs and the final session:
-      - S01: `working@10:00:00`, `waiting@10:00:02`, `working@10:00:10`, `standby@10:00:11`.
-      - S02: `working@10:00:00`, `waiting@10:00:01.200`, `working@10:00:20`, `standby@10:00:21`.
-      - S03: `working@10:00:00`, `waiting@10:00:02`, `standby@10:00:05`.
+      - The first state of a session arrives in `session-added`, not as a `state-changed`.
+      - S01: `waiting@10:00:02`, `working@10:00:10`, `standby@10:00:11`.
+      - S02: `waiting@10:00:01.200`, `working@10:00:20`, `standby@10:00:21`.
+      - S03: `waiting@10:00:02`, `standby@10:00:05`.
       - S04: `waiting@10:00:04.500` stays through the busy subagent's `10:00:05`–`10:00:10` entries with `runningSubagents: 2`, then `working@10:00:20`, then `standby@10:00:30`.
       - S05: `waiting@10:00:03.500` with `runningSubagents: 1` stays through the subagent's entries, then `working@10:00:15`, and ends `working` with 1 running subagent.
     - `sessions()` while waiting reports `state: "waiting"` and `stateSince` equal to the wait's `ts`.
