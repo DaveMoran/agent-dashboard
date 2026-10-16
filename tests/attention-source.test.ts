@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, renameSync } from "node:fs";
 import path from "node:path";
 import { compileMainAgentPattern } from "../src/agents/main-agent";
 import type { AgentSourceEvent } from "../src/agents/source";
@@ -353,4 +353,93 @@ test("unsorted-events: S07 is waiting since 10:00:05 and S06 is not waiting, in 
     expect(s7.stateSince).toBe(T("10:00:05.000"));
     expect(s6.state).not.toBe("waiting");
   }
+});
+
+// T012: unknown sessions and the hold timeout (FR-011, research R7, US2 scenario 4).
+const S10 = sid("10");
+
+async function lateSession(nowIso: string, opts: { holdMs?: number; resultLine?: string } = {}) {
+  const REPO = await makeGitRepo();
+  const m = await materializeAttention("late-session", { REPO });
+  const base = createTranscriptSource({
+    root: m.transcriptsRoot,
+    mainAgentPattern: pattern,
+    pollIntervalMs: 0,
+  });
+  const attention = createAttentionSource({
+    base,
+    eventsFile: m.eventsFile,
+    pollIntervalMs: 0,
+    now: () => Date.parse(nowIso),
+    ...(opts.holdMs === undefined ? {} : { holdMs: opts.holdMs }),
+  });
+  started.push(attention);
+  const events: AgentSourceEvent[] = [];
+  attention.subscribe((e) => events.push(e));
+  await attention.start();
+  await base.refresh();
+  await attention.refresh();
+  const later = path.join(m.dir, "later", "-repo", `${S10}.jsonl`);
+  if (opts.resultLine !== undefined) appendLine(later, opts.resultLine);
+  const move = async () => {
+    renameSync(later, path.join(m.transcriptsRoot, "-repo", `${S10}.jsonl`));
+    await base.refresh();
+    await attention.refresh();
+  };
+  return { attention, events, move };
+}
+
+const toolResultTu1 = JSON.stringify({
+  type: "user",
+  timestamp: T("10:00:03.000"),
+  sessionId: S10,
+  cwd: "/repo",
+  message: { role: "user", content: [{ type: "tool_result", tool_use_id: "tu1", content: "ok" }] },
+});
+
+test("T012 hook events for an unknown session never create a session", async () => {
+  const { attention, events } = await lateSession("2026-10-15T10:05:00.000Z");
+  expect(attention.sessions()).toStrictEqual([]);
+  expect(events).toStrictEqual([]);
+});
+
+test("T012 a held wait is applied when the transcript appears (US2 scenario 4)", async () => {
+  const { attention, move } = await lateSession("2026-10-15T10:05:00.000Z");
+  await move();
+  const s = attention.sessions().find((x) => x.sessionId === S10)!;
+  expect(attention.sessions()).toHaveLength(1);
+  expect(s.state).toBe("waiting");
+  expect(s.stateSince).toBe(T("10:00:02.000"));
+});
+
+test("T012 a record older than holdMs is dropped on an events pass, so the session is working", async () => {
+  const { attention, move } = await lateSession("2026-10-15T10:20:00.000Z");
+  await move();
+  const s = attention.sessions().find((x) => x.sessionId === S10)!;
+  expect(attention.sessions()).toHaveLength(1);
+  expect(s.state).toBe("working");
+  expect(s.stateSince).not.toBe(T("10:00:02.000"));
+});
+
+test("T012 a custom holdMs is respected", async () => {
+  const dropped = await lateSession("2026-10-15T10:02:00.000Z", { holdMs: 60_000 });
+  await dropped.move();
+  expect(dropped.attention.sessions().find((x) => x.sessionId === S10)!.state).toBe("working");
+});
+
+test("T012 a record inside a custom holdMs is kept", async () => {
+  const kept = await lateSession("2026-10-15T10:00:30.000Z", { holdMs: 60_000 });
+  await kept.move();
+  const s = kept.attention.sessions().find((x) => x.sessionId === S10)!;
+  expect(s.state).toBe("waiting");
+  expect(s.stateSince).toBe(T("10:00:02.000"));
+});
+
+test("T012 a held wait whose tool result is already in the moved transcript is not waiting", async () => {
+  const { attention, move } = await lateSession("2026-10-15T10:05:00.000Z", {
+    resultLine: toolResultTu1,
+  });
+  await move();
+  const s = attention.sessions().find((x) => x.sessionId === S10)!;
+  expect(s.state).not.toBe("waiting");
 });

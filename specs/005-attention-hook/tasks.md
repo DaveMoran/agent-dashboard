@@ -264,7 +264,7 @@ description: "Task list for 005-attention-hook"
   - The final `sessions()` projected to `{ sessionId, state, runningSubagents }` (sorted by ID) is identical across the three orders and equals the README's expected final states.
   - Under `transcripts-first`, S01, S02 and S03 never emit a `state-changed` with `to: "waiting"` (US2 scenario 1).
   - S07 in `unsorted-events` is `waiting` with `stateSince` `10:00:05`, and S06 is not waiting (US2 scenario 3).
-- [ ] T012 [US2] (tester → coder) Unknown sessions and the hold timeout (FR-011, research R7). Test file: `tests/attention-source.test.ts`. Code: `src/agents/attention/source.ts`.
+- [X] T012 [US2] (tester → coder) Unknown sessions and the hold timeout (FR-011, research R7). Test file: `tests/attention-source.test.ts`. Code: `src/agents/attention/source.ts`.
   - Records for session IDs the base does not report are kept, and applied when the base announces the session (on `session-added`, recompute).
   - On each events pass, drop records whose session is unknown to the base and whose `now() - Date.parse(newestAt) > holdMs`.
   - Hook events never add sessions to `sessions()`.

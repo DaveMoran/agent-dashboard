@@ -33,6 +33,7 @@ export function createAttentionSource(options: AttentionSourceOptions): AgentSou
   const { base, eventsFile } = options;
   const pollMs = options.pollIntervalMs ?? 500;
   const now = options.now ?? Date.now;
+  const holdMs = options.holdMs ?? 10 * 60 * 1000;
 
   const tail = new FileTail(eventsFile);
   const records = new Map<string, AttentionRecord>();
@@ -157,11 +158,22 @@ export function createAttentionSource(options: AttentionSourceOptions): AgentSou
     }
   }
 
+  function pruneStale(): void {
+    const known = new Set(base.sessions().map((s) => s.sessionId));
+    const t = now();
+    for (const [id, record] of records) {
+      if (known.has(id) || record.newestAt === undefined) continue;
+      if (t - Date.parse(record.newestAt) > holdMs) records.delete(id);
+    }
+  }
+
   function refresh(): Promise<void> {
     if (inflight !== undefined) return inflight;
-    const run = readEvents().finally(() => {
-      if (inflight === run) inflight = undefined;
-    });
+    const run = readEvents()
+      .then(pruneStale)
+      .finally(() => {
+        if (inflight === run) inflight = undefined;
+      });
     inflight = run;
     return run;
   }
