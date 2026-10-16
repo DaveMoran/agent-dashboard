@@ -58,7 +58,7 @@ description: "Task list for 005-attention-hook"
     - each of `tool-result`, `progress`, `final`, `turn-end`, `interrupt` and `session-end` moves it;
     - an older timestamp does not move it back;
     - the input is not mutated.
-- [ ] T005 (tester → coder) Transcript source extras (`contracts/agent-source.md`, "Transcript source additions"). Test file: `tests/transcript-source.test.ts` (add tests). Code: `src/agents/transcripts/source.ts`.
+- [X] T005 (tester → coder) Transcript source extras (`contracts/agent-source.md`, "Transcript source additions"). Test file: `tests/transcript-source.test.ts` (add tests). Code: `src/agents/transcripts/source.ts`.
   - Export `interface AgentClears { main: string | undefined; subagents: Record<string, string | undefined>; lastTurnAt: string | undefined }`.
   - Add to the factory's return type:
     - `clears(sessionId: string): AgentClears | undefined`. For the visible record with that session ID, `main` is the main track's `lastTurnAt`. `subagents[id]` is the later of that subagent track's `lastTurnAt` and `main.state.completedAgentIds[id]`. `lastTurnAt` is the max over the main and all subagent `lastTurnAt` values. Returns `undefined` for an unknown session ID.

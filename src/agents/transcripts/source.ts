@@ -50,8 +50,19 @@ function maxTime(a: string | undefined, b: string | undefined): string | undefin
   return Date.parse(b) > Date.parse(a) ? b : a;
 }
 
+export interface AgentClears {
+  /** Latest turn-entry timestamp in the main transcript. */
+  main: string | undefined;
+  /** Per subagent ID: latest turn-entry timestamp, or its completion time if later. */
+  subagents: Record<string, string | undefined>;
+  /** Latest turn-entry timestamp across main and subagents. */
+  lastTurnAt: string | undefined;
+}
+
 export function createTranscriptSource(options: TranscriptSourceOptions): AgentSource & {
   refresh(): Promise<void>;
+  clears(sessionId: string): AgentClears | undefined;
+  onActivity(listener: (sessionId: string) => void): () => void;
 } {
   const root = options.root;
   const pattern = options.mainAgentPattern;
@@ -63,6 +74,9 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
   /** Session ids already announced with session-added (a duplicate file taking over does not repeat it). */
   const addedIds = new Set<string>();
   const issueLog: IngestIssue[] = [];
+  const activityListeners = new Set<(sessionId: string) => void>();
+  /** Records that folded at least one new line in the current pass. */
+  const touched = new Set<FileRec>();
   let active = false;
   let startPromise: Promise<void> | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -219,6 +233,7 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
         continue;
       }
       const entry = result.entry;
+      touched.add(rec);
       track.state = applyEntry(track.state, entry);
       updateCombined(rec, entry.timestamp);
       if (!silent) await report(rec, entry.timestamp ?? track.state.lastActivity);
@@ -260,7 +275,43 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
     }
   }
 
+  function notifyActivity(): void {
+    const ids = new Set<string>();
+    for (const rec of touched) {
+      if (recs.get(rec.file) !== rec || !rec.announced || !isVisible(rec)) continue;
+      ids.add(rec.reported!.sessionId);
+    }
+    touched.clear();
+    if (!active) return;
+    for (const id of ids) {
+      for (const listener of [...activityListeners]) {
+        if (!active) return;
+        if (!activityListeners.has(listener)) continue;
+        try {
+          listener(id);
+        } catch {
+          // listeners own their errors
+        }
+      }
+    }
+  }
+
+  function clears(sessionId: string): AgentClears | undefined {
+    for (const rec of recs.values()) {
+      if (rec.reported?.sessionId !== sessionId || !isVisible(rec)) continue;
+      const subagents: Record<string, string | undefined> = {};
+      let lastTurnAt = rec.main.state.lastTurnAt;
+      for (const [agentId, sub] of rec.subs) {
+        subagents[agentId] = maxTime(sub.state.lastTurnAt, rec.main.state.completedAgentIds[agentId]);
+        lastTurnAt = maxTime(lastTurnAt, sub.state.lastTurnAt);
+      }
+      return { main: rec.main.state.lastTurnAt, subagents, lastTurnAt };
+    }
+    return undefined;
+  }
+
   async function pass(): Promise<void> {
+    touched.clear();
     const files = await listSessionFiles(root);
     const present = new Set(files);
     for (const file of [...recs.keys()]) if (!present.has(file)) recs.delete(file);
@@ -318,6 +369,7 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
         announceVisible(rec);
       }
     }
+    notifyActivity();
   }
 
   function refresh(): Promise<void> {
@@ -332,6 +384,13 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
   return {
     name: "transcripts",
     refresh,
+    clears,
+    onActivity(listener) {
+      activityListeners.add(listener);
+      return () => {
+        activityListeners.delete(listener);
+      };
+    },
     start(): Promise<void> {
       if (startPromise === undefined) {
         active = true;
