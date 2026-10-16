@@ -21,7 +21,7 @@ export function groupFeatureFiles(roots: string[], absFiles: string[]): FeatureC
     let rootIndex = -1;
     for (let i = 0; i < roots.length; i++) {
       const r = roots[i]!;
-      if (file.startsWith(r + "/") && (rootIndex < 0 || r.length > roots[rootIndex]!.length)) {
+      if (file.startsWith(`${r}/`) && (rootIndex < 0 || r.length > roots[rootIndex]!.length)) {
         rootIndex = i;
       }
     }

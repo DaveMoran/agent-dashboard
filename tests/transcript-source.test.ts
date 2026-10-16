@@ -38,7 +38,7 @@ async function makeDirs() {
   const WORKTREE = await addWorktree(REPO, { newBranch: "wt" });
   const PLAIN = await realpath(await mkdtemp(path.join(os.tmpdir(), "av-plain-")));
   trackTempDir(PLAIN);
-  return { REPO, WORKTREE, PLAIN, MISSING: PLAIN + "/gone" };
+  return { REPO, WORKTREE, PLAIN, MISSING: `${PLAIN}/gone` };
 }
 
 async function setup(
@@ -289,7 +289,7 @@ test("a subagent count change without a state change emits session-updated", asy
   const dir = path.dirname(fileOf(env.root, "agent-a0000000000000001.jsonl"));
   writeFileSync(
     path.join(dir, "agent-a0000000000000009.jsonl"),
-    prompt(id("3"), env.REPO, "10:10:00") + "\n",
+    `${prompt(id("3"), env.REPO, "10:10:00")}\n`,
   );
   env.events.length = 0;
   await env.source.refresh();
@@ -305,7 +305,7 @@ test("new session files and new project folders appear after refresh", async () 
   const folder = path.join(env.root, "-newproj");
   mkdirSync(folder);
   const sid = id("a");
-  writeFileSync(path.join(folder, `${sid}.jsonl`), prompt(sid, env.PLAIN, "12:00:00") + "\n");
+  writeFileSync(path.join(folder, `${sid}.jsonl`), `${prompt(sid, env.PLAIN, "12:00:00")}\n`);
   env.events.length = 0;
   await env.source.refresh();
   expect(
@@ -327,7 +327,7 @@ test("a missing root yields nothing, then sessions once it exists", async () => 
   expect(source.sessions()).toEqual([]);
   expect(source.issues()).toEqual([]);
   mkdirSync(path.join(root, "-p"), { recursive: true });
-  writeFileSync(path.join(root, "-p", `${id("b")}.jsonl`), prompt(id("b"), base, "12:00:00") + "\n");
+  writeFileSync(path.join(root, "-p", `${id("b")}.jsonl`), `${prompt(id("b"), base, "12:00:00")}\n`);
   await source.refresh();
   expect(source.sessions().map((s) => s.sessionId)).toEqual([id("b")]);
 });
@@ -337,7 +337,7 @@ test("truncation rebuilds the session with one state change", async () => {
   const file = fileOf(env.root, ".jsonl");
   const first = await Bun.file(file).text();
   const firstPrompt = first.split("\n").find((l) => l.includes("Add a test"))!;
-  writeFileSync(file, firstPrompt + "\n");
+  writeFileSync(file, `${firstPrompt}\n`);
   env.events.length = 0;
   await env.source.refresh();
   const changes = stateChanges(env.events);
@@ -365,8 +365,7 @@ test("duplicate session ids report only the file with the latest activity", asyn
 test("a large file is folded from the start: padding after a task notification does not hide it (R5 reversed)", async () => {
   const env = await setup("background-subagents", { start: false });
   const parent = fileOf(env.root, `${id("4")}.jsonl`);
-  const padLine =
-    JSON.stringify({ type: "file-history-snapshot", timestamp: T("10:03:00"), pad: "x".repeat(1000) }) + "\n";
+  const padLine = `${JSON.stringify({ type: "file-history-snapshot", timestamp: T("10:03:00"), pad: "x".repeat(1000) })}\n`;
   appendRaw(parent, padLine.repeat(3000));
   // A model and a state-bearing entry at the very end, so a last-2-MiB window would find both and
   // never fall back to a full read; only the notification before the padding would be missed.
@@ -424,7 +423,7 @@ test("an unreadable file is reported once and does not break other sessions", as
   const env = await setup("plain-turn");
   const bad = path.join(env.root, "-bad", `${id("e")}.jsonl`);
   mkdirSync(path.dirname(bad));
-  writeFileSync(bad, prompt(id("e"), env.REPO, "12:00:00") + "\n");
+  writeFileSync(bad, `${prompt(id("e"), env.REPO, "12:00:00")}\n`);
   chmodSync(bad, 0o000);
   await env.source.refresh();
   await env.source.refresh();

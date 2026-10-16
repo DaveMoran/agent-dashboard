@@ -1,3 +1,4 @@
+import type { Stats } from "node:fs";
 import { stat } from "node:fs/promises";
 
 export interface TailLine {
@@ -24,7 +25,7 @@ export class FileTail {
   }
 
   async read(): Promise<TailResult> {
-    let st;
+    let st: Stats;
     try {
       st = await stat(this.path);
       if (!st.isFile()) throw new Error("not a regular file");

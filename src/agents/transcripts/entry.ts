@@ -41,13 +41,13 @@ const OTHER_PREFIXES = [
 
 function blocksOfType(content: unknown, type: string): Obj[] {
   if (!Array.isArray(content)) return [];
-  return content.filter((b): b is Obj => isObj(b) && b["type"] === type);
+  return content.filter((b): b is Obj => isObj(b) && b.type === type);
 }
 
 function userText(content: unknown): string {
   if (typeof content === "string") return content;
   const first = blocksOfType(content, "text")[0];
-  return first ? (str(first["text"]) ?? "") : "";
+  return first ? (str(first.text) ?? "") : "";
 }
 
 function completedIds(text: string): string[] {
@@ -67,10 +67,10 @@ export function classifyLine(line: string): ClassifyResult {
     return { issue: { reason: "invalid-json" } };
   }
   if (!isObj(parsed)) return { issue: { reason: "not-an-object" } };
-  const type = parsed["type"];
+  const type = parsed.type;
   if (typeof type !== "string") return { issue: { reason: "missing-field", field: "type" } };
 
-  const timestamp = str(parsed["timestamp"]);
+  const timestamp = str(parsed.timestamp);
   const make = (
     kind: EntryKind,
     extra: Partial<Pick<TranscriptEntry, "model" | "toolUseIds" | "completedAgentIds">> = {},
@@ -78,24 +78,24 @@ export function classifyLine(line: string): ClassifyResult {
     entry: {
       kind,
       timestamp,
-      sessionId: str(parsed["sessionId"]),
-      cwd: str(parsed["cwd"]),
+      sessionId: str(parsed.sessionId),
+      cwd: str(parsed.cwd),
       model: extra.model,
       toolUseIds: extra.toolUseIds ?? [],
       completedAgentIds: extra.completedAgentIds ?? [],
     },
   });
   const missingTs: ClassifyResult = { issue: { reason: "missing-field", field: "timestamp" } };
-  const message = isObj(parsed["message"]) ? parsed["message"] : undefined;
-  const content = message?.["content"];
+  const message = isObj(parsed.message) ? parsed.message : undefined;
+  const content = message?.content;
 
   if (type === "user") {
     if (timestamp === undefined) return missingTs;
-    if (parsed["isMeta"] === true) return make("other");
+    if (parsed.isMeta === true) return make("other");
     const results = blocksOfType(content, "tool_result");
     if (results.length > 0) {
       return make("tool-result", {
-        toolUseIds: results.map((b) => str(b["tool_use_id"])).filter((s): s is string => s !== undefined),
+        toolUseIds: results.map((b) => str(b.tool_use_id)).filter((s): s is string => s !== undefined),
       });
     }
     const text = userText(content);
@@ -107,8 +107,7 @@ export function classifyLine(line: string): ClassifyResult {
     if (
       typeof content === "string"
         ? content.length > 0
-        : Array.isArray(content) &&
-          content.some((b) => isObj(b) && (b["type"] === "text" || b["type"] === "image"))
+        : Array.isArray(content) && content.some((b) => isObj(b) && (b.type === "text" || b.type === "image"))
     ) {
       return make("prompt");
     }
@@ -117,33 +116,29 @@ export function classifyLine(line: string): ClassifyResult {
 
   if (type === "assistant") {
     if (timestamp === undefined) return missingTs;
-    const m = str(message?.["model"]);
+    const m = str(message?.model);
     const model = m !== undefined && m !== "" && m !== "<synthetic>" ? m : undefined;
     const calls = blocksOfType(content, "tool_use");
     if (calls.length > 0) {
       return make("tool-call", {
         model,
-        toolUseIds: calls.map((b) => str(b["id"])).filter((s): s is string => s !== undefined),
+        toolUseIds: calls.map((b) => str(b.id)).filter((s): s is string => s !== undefined),
       });
     }
-    const stop = message?.["stop_reason"];
+    const stop = message?.stop_reason;
     if (stop === null || stop === undefined || stop === "tool_use") return make("progress", { model });
     return make("final", { model });
   }
 
   if (type === "system") {
-    if (parsed["subtype"] === "turn_duration" && timestamp !== undefined) return make("turn-end");
+    if (parsed.subtype === "turn_duration" && timestamp !== undefined) return make("turn-end");
     return make("other");
   }
 
   if (type === "attachment") {
-    const att = isObj(parsed["attachment"]) ? parsed["attachment"] : undefined;
-    const prompt = str(att?.["prompt"]);
-    if (
-      att?.["type"] === "queued_command" &&
-      prompt !== undefined &&
-      prompt.startsWith("<task-notification>")
-    ) {
+    const att = isObj(parsed.attachment) ? parsed.attachment : undefined;
+    const prompt = str(att?.prompt);
+    if (att?.type === "queued_command" && prompt !== undefined && prompt.startsWith("<task-notification>")) {
       return make("other", { completedAgentIds: completedIds(prompt) });
     }
     return make("other");

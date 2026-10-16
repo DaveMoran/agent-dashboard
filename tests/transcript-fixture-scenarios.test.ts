@@ -42,7 +42,8 @@ function load(name: string): Scenario {
     const rel = path.relative(path.join(ROOT, name), file).split(path.sep);
     if (rel.includes("subagents")) {
       const sid = rel[rel.length - 3]!;
-      (out.subs[sid] ??= {})[path.basename(file).replace(/^agent-|\.jsonl$/g, "")] = fold(file).state;
+      out.subs[sid] ??= {};
+      out.subs[sid][path.basename(file).replace(/^agent-|\.jsonl$/g, "")] = fold(file).state;
     } else {
       out.sessions[path.basename(file, ".jsonl")] = fold(file);
     }
@@ -80,7 +81,7 @@ test("foreground-subagent: working with one running subagent", () => {
   const sid = id("3");
   expect(s.sessions[sid]!.state.state).toBe("working");
   expect(s.sessions[sid]!.state.openToolUseIds).toEqual(["tu1"]);
-  const sub = s.subs[sid]!["a0000000000000001"]!;
+  const sub = s.subs[sid]!.a0000000000000001!;
   expect(sub.state).toBe("working");
   expect(sub.model).toBe("claude-sonnet-5-5");
   expect(running(s, sid)).toEqual(["a0000000000000001"]);
@@ -95,14 +96,14 @@ test("background-subagents: turn standby, one running subagent, combined working
   expect(parent.openToolUseIds).toEqual([]);
   expect(Object.keys(parent.completedAgentIds)).toEqual(["a0000000000000002"]);
   const subs = s.subs[sid]!;
-  expect(subs["a0000000000000001"]!.state).toBe("standby");
-  expect(subs["a0000000000000002"]!.state).toBe("working");
-  expect(subs["a0000000000000003"]!.state).toBe("working");
-  expect(Date.parse(subs["a0000000000000002"]!.lastActivity!)).toBeLessThan(
-    Date.parse(parent.completedAgentIds["a0000000000000002"]!),
+  expect(subs.a0000000000000001!.state).toBe("standby");
+  expect(subs.a0000000000000002!.state).toBe("working");
+  expect(subs.a0000000000000003!.state).toBe("working");
+  expect(Date.parse(subs.a0000000000000002!.lastActivity!)).toBeLessThan(
+    Date.parse(parent.completedAgentIds.a0000000000000002!),
   );
-  expect(Date.parse(subs["a0000000000000003"]!.lastActivity!)).toBeLessThan(
-    Date.parse(parent.completedAgentIds["a0000000000000002"]!),
+  expect(Date.parse(subs.a0000000000000003!.lastActivity!)).toBeLessThan(
+    Date.parse(parent.completedAgentIds.a0000000000000002!),
   );
   expect(running(s, sid)).toEqual(["a0000000000000003"]);
   expect(combineState(parent.state, running(s, sid).length)).toBe("working");

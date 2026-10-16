@@ -53,13 +53,13 @@ export function parseCliArgs(argv: string[]): CliOptions {
 
     const { port } = values;
 
-    let repoPath: string | undefined = undefined;
+    let repoPath: string | undefined;
     if (positionals.length > 0) {
       repoPath = positionals[0];
     }
 
     // Validate port if provided
-    let validatedPort: number | undefined = undefined;
+    let validatedPort: number | undefined;
     if (port !== undefined) {
       // Check if port matches the required pattern /^\d+$/
       if (!/^\d+$/.test(port)) {

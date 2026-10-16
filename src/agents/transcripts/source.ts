@@ -1,4 +1,3 @@
-import { stat } from "node:fs/promises";
 import path from "node:path";
 import type { SessionState } from "../../contract/sessions";
 import type { AgentSession, AgentSource, AgentSourceEvent, IngestIssue } from "../source";
@@ -236,7 +235,7 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
     return err instanceof Error ? err.message : String(err);
   }
 
-  async function readTrack(rec: FileRec, track: Track, isSub: boolean, silent: boolean): Promise<void> {
+  async function readTrack(rec: FileRec, track: Track, silent: boolean): Promise<void> {
     const file = track.tail.path;
     const sink: IngestIssue[] = [];
     try {
@@ -284,7 +283,7 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
         recs.set(file, rec);
       }
       const silent = !rec.announced;
-      await readTrack(rec, rec.main, false, silent);
+      await readTrack(rec, rec.main, silent);
 
       if (rec.main.state.lastActivity !== undefined) {
         const found = await listSubagentFiles(file);
@@ -301,7 +300,7 @@ export function createTranscriptSource(options: TranscriptSourceOptions): AgentS
             track = newTrack(sub.path);
             rec.subs.set(sub.agentId, track);
           }
-          await readTrack(rec, track, true, silent);
+          await readTrack(rec, track, silent);
         }
       }
 

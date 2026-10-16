@@ -5,7 +5,7 @@ const T = "2026-10-15T10:00:00.000Z";
 const j = (o: unknown) => JSON.stringify(o);
 const entry = (line: string): TranscriptEntry => {
   const r = classifyLine(line);
-  if (!("entry" in r)) throw new Error("expected entry, got " + JSON.stringify(r));
+  if (!("entry" in r)) throw new Error(`expected entry, got ${JSON.stringify(r)}`);
   return r.entry;
 };
 const user = (content: unknown, extra: object = {}) =>

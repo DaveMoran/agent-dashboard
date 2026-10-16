@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { classifyLine } from "../src/agents/transcripts/entry";
+import { classifyLine, type TranscriptEntry } from "../src/agents/transcripts/entry";
 import { applyEntry, initialSessionState, type SessionStateT } from "../src/agents/transcripts/session-state";
 import { combineState, isSubagentRunning } from "../src/agents/transcripts/subagents";
 
@@ -19,9 +19,15 @@ const notif = (t: string, id: string) =>
   u(t, `<task-notification>\n<task-id>${id}</task-id>\n<status>killed</status>\n</task-notification>`);
 const T = (n: number) => `2026-10-15T10:0${n}:00.000Z`;
 
+function entryOf(line: string): TranscriptEntry {
+  const r = classifyLine(line);
+  if (!("entry" in r)) throw new Error(`expected an entry, got issue ${r.issue.reason}`);
+  return r.entry;
+}
+
 function fold(lines: string[]): SessionStateT {
   let s = initialSessionState();
-  for (const l of lines) s = applyEntry(s, (classifyLine(l) as any).entry);
+  for (const l of lines) s = applyEntry(s, entryOf(l));
   return s;
 }
 
@@ -77,7 +83,7 @@ test("scenario 6 in memory", () => {
   const running = () => Object.entries(subs).filter(([id, s]) => isSubagentRunning(id, s, parent)).length;
   expect(running()).toBe(1);
   expect(combineState(parent.state, running())).toBe("working");
-  subs["c"] = applyEntry(subs["c"]!, (classifyLine(final(T(9))) as any).entry);
+  subs.c = applyEntry(subs.c!, entryOf(final(T(9))));
   expect(running()).toBe(0);
   expect(combineState(parent.state, running())).toBe("standby");
 });

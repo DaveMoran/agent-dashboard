@@ -25,5 +25,5 @@ test("appendLine adds a newline, appendRaw does not", async () => {
   const base = readFileSync(f, "utf8");
   appendLine(f, "a");
   appendRaw(f, "b");
-  expect(readFileSync(f, "utf8")).toBe(base + "a\nb");
+  expect(readFileSync(f, "utf8")).toBe(`${base}a\nb`);
 });

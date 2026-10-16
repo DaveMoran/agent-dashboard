@@ -56,7 +56,7 @@ export async function writeInstance(record: InstanceRecord): Promise<void> {
   const tmp = path.join(dir, `.server.json.${process.pid}.${Date.now()}.tmp`);
   try {
     await fs.promises.mkdir(dir, { recursive: true, mode: 0o700 });
-    await fs.promises.writeFile(tmp, JSON.stringify(record, null, 2) + "\n");
+    await fs.promises.writeFile(tmp, `${JSON.stringify(record, null, 2)}\n`);
     await fs.promises.rename(tmp, file);
   } catch (error) {
     await fs.promises.rm(tmp, { force: true }).catch(() => {});

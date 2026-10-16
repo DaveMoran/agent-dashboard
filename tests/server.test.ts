@@ -150,7 +150,7 @@ test("devUi: non-API requests are proxied to the upstream, /api/health stays loc
     hostname: "127.0.0.1",
     fetch: (req) => {
       const url = new URL(req.url);
-      seen.push(req.method + " " + url.pathname + url.search);
+      seen.push(`${req.method} ${url.pathname}${url.search}`);
       if (url.pathname === "/")
         return new Response("<html>VITE</html>", { headers: { "content-type": "text/html" } });
       if (url.pathname === "/foo.js")

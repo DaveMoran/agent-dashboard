@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { classifyLine } from "../src/agents/transcripts/entry";
+import { classifyLine, type TranscriptEntry } from "../src/agents/transcripts/entry";
 import { applyEntry, initialSessionState, type SessionStateT } from "../src/agents/transcripts/session-state";
 
 const j = (o: unknown) => JSON.stringify(o);
@@ -20,11 +20,17 @@ const final = (t: string) =>
     message: { model: "claude-opus-5-5", stop_reason: "end_turn", content: [{ type: "text", text: "ok" }] },
   });
 
+function entryOf(line: string): TranscriptEntry {
+  const r = classifyLine(line);
+  if (!("entry" in r)) throw new Error(`expected an entry, got issue ${r.issue.reason}`);
+  return r.entry;
+}
+
 function fold(lines: string[]): SessionStateT {
   let s = initialSessionState();
   for (const l of lines) {
     const r = classifyLine(l);
-    if (!("entry" in r)) throw new Error("bad line " + l);
+    if (!("entry" in r)) throw new Error(`bad line ${l}`);
     s = applyEntry(s, r.entry);
   }
   return s;
@@ -139,13 +145,12 @@ function deepFreeze<T>(o: T): T {
 
 test("applyEntry does not mutate its input", () => {
   let s = fold([u(T(1)), call(T(2), "t1")]);
-  s = applyEntry(s, { ...(classifyLine(u(T(0))) as any).entry });
+  s = applyEntry(s, { ...entryOf(u(T(0))) });
   const frozen = deepFreeze(s);
   const before = JSON.stringify(frozen);
   const notif = "<task-notification><task-id>x</task-id><status>c</status></task-notification>";
   for (const l of [result(T(3), "t1"), call(T(4), "t2"), final(T(5)), u(T(6), notif)]) {
-    const r = classifyLine(l) as any;
-    const out = applyEntry(frozen, r.entry);
+    const out = applyEntry(frozen, entryOf(l));
     expect(out).not.toBe(frozen);
   }
   expect(JSON.stringify(frozen)).toBe(before);
@@ -170,7 +175,7 @@ test("session-end after a prompt gives standby and ended; a later prompt resumes
   expect(s.stateSince).toBe(T(3));
   expect(s.ended).toBe(true);
   expect(s.openToolUseIds).toEqual([]);
-  const r = applyEntry(s, (classifyLine(u(T(4))) as any).entry);
+  const r = applyEntry(s, entryOf(u(T(4))));
   expect(r.state).toBe("working");
   expect(r.ended).toBe(false);
 });
