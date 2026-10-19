@@ -172,7 +172,7 @@ description: "Task list for 006-magi-slots"
 
 **Independent Test**: `describe("US3 stateSince")` in `tests/magi-slots.test.ts`.
 
-- [ ] T010 [US3] (tester → coder) `stateSince` rule. Test file: `tests/magi-slots.test.ts` (add `describe("US3 stateSince")`). Code: `src/magi/slots.ts`. Implement research R5 and data-model `prevLive`:
+- [X] T010 [US3] (tester → coder) `stateSince` rule. Test file: `tests/magi-slots.test.ts` (add `describe("US3 stateSince")`). Code: `src/magi/slots.ts`. Implement research R5 and data-model `prevLive`:
   - **Drop times this step**: for each `sessionId` in `prev.prevLive` that is not live now:
     - if it is still in `sessions` and has a parseable `lastActivity`, it drops at `min(nowMs, Date.parse(lastActivity) + timeout)`, where `timeout` is `waitingMs` if its current state is `waiting` and `idleMs` otherwise;
     - otherwise it drops at `nowMs`.

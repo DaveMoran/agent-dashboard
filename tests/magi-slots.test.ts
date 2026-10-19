@@ -370,3 +370,109 @@ describe("US2 timeouts", () => {
     expect(view(step(s2, [answered], "11:20:00.001"))).toStrictEqual(threeFree);
   });
 });
+
+describe("US3 stateSince", () => {
+  const brainOf = (state: SlotState, n: 0 | 1 | 2): BrainView => state.brains[n] as BrainView;
+  const heldSince = (number: 1 | 2 | 3, p: string, state: BrainState, since: string | null): BrainView => ({
+    ...held(number, p, state),
+    stateSince: since,
+  });
+  const freeSince = (number: 1 | 2 | 3, since: string | null): BrainView => ({
+    ...free(number),
+    stateSince: since,
+  });
+
+  test("first step uses the session's own stateSince", () => {
+    const a = sess("a", "10:25", { state: "working", stateSince: iso("09:50") });
+    const out = step(emptySlotState(), [a], "10:30");
+    expect(brainOf(out, 0)).toStrictEqual(heldSince(1, "a", "working", "2026-10-18T09:50:00.000Z"));
+  });
+
+  test("first step with no session stateSince uses now", () => {
+    const out = step(emptySlotState(), [sess("a", "10:25", { state: "working" })], "10:30");
+    expect(brainOf(out, 0)).toStrictEqual(heldSince(1, "a", "working", iso("10:30")));
+  });
+
+  test("a project taken on a later step is stamped now, not the session's time (US3-7)", () => {
+    const a = sess("a", "10:20", { state: "standby", stateSince: iso("10:10") });
+    const s1 = step(emptySlotState(), [a], "10:25");
+    const b = sess("b", "10:29", { state: "working", stateSince: iso("10:20") });
+    const s2 = step(s1, [a, b], "10:30");
+    expect(brainOf(s2, 0)).toStrictEqual(heldSince(1, "a", "standby", iso("10:10")));
+    expect(brainOf(s2, 1)).toStrictEqual(heldSince(2, "b", "working", iso("10:30")));
+  });
+
+  test("working to standby takes the session's change time (US3-5)", () => {
+    const working = sess("a", "10:25", { state: "working", stateSince: iso("10:20") });
+    const s1 = step(emptySlotState(), [working], "10:26");
+    expect(brainOf(s1, 0).stateSince).toBe(iso("10:20"));
+    const standby = sess("a", "10:28", { state: "standby", stateSince: iso("10:28") });
+    const s2 = step(s1, [standby], "10:29");
+    expect(brainOf(s2, 0)).toStrictEqual(heldSince(1, "a", "standby", iso("10:28")));
+  });
+
+  test("a second session starting to work leaves stateSince unchanged (US3-6)", () => {
+    const x = sess("a", "10:20", { sessionId: "x", state: "working", stateSince: iso("10:00") });
+    const s1 = step(emptySlotState(), [x], "10:21");
+    const y = sess("a", "10:29", { sessionId: "y", state: "working", stateSince: iso("10:29") });
+    const s2 = step(s1, [x, y], "10:30");
+    expect(brainOf(s2, 0)).toStrictEqual(heldSince(1, "a", "working", iso("10:00")));
+  });
+
+  for (const ySince of ["09:30", "09:05"]) {
+    test(`a dropped working session moves the brain to standby at the drop time (Y since ${ySince})`, () => {
+      const x = sess("a", "09:00", { sessionId: "x", state: "working", stateSince: iso("08:59") });
+      const y = sess("a", "10:20", { sessionId: "y", state: "standby", stateSince: iso(ySince) });
+      const s1 = step(emptySlotState(), [x, y], "09:10");
+      expect(brainOf(s1, 0)).toStrictEqual(heldSince(1, "a", "working", iso("08:59")));
+      const s2 = step(s1, [x, y], "09:40");
+      expect(brainOf(s2, 0)).toStrictEqual(heldSince(1, "a", "standby", iso("09:30")));
+    });
+  }
+
+  test("a brain freed by timeout reports the expiry time (US3-7)", () => {
+    const a = sess("a", "10:00", { state: "standby" });
+    const s1 = step(emptySlotState(), [a], "10:00");
+    const s2 = step(s1, [a], "10:20");
+    expect(brainOf(s2, 0).state).toBe("standby");
+    const s3 = step(s2, [a], "10:45");
+    expect(brainOf(s3, 0)).toStrictEqual(freeSince(1, iso("10:30")));
+  });
+
+  test("a brain freed by a session ending reports now (US3-7)", () => {
+    const a = sess("a", "10:20", { state: "standby" });
+    const s1 = step(emptySlotState(), [a], "10:25");
+    const s2 = step(s1, [a], "10:30");
+    expect(brainOf(s2, 0).state).toBe("standby");
+    const s3 = step(s2, [], "10:40");
+    expect(brainOf(s3, 0)).toStrictEqual(freeSince(1, iso("10:40")));
+  });
+
+  test("a brain free since start keeps a null stateSince", () => {
+    const a = sess("a", "10:20", { state: "working", stateSince: iso("10:00") });
+    const s1 = step(emptySlotState(), [a], "10:21");
+    const s2 = step(s1, [a], "10:22");
+    const s3 = step(s2, [], "10:23");
+    for (const s of [s1, s2, s3]) {
+      expect(brainOf(s, 1)).toStrictEqual(freeSince(2, null));
+      expect(brainOf(s, 2)).toStrictEqual(freeSince(3, null));
+    }
+    expect(brainOf(s1, 1).project).toBeNull();
+  });
+
+  test("waiting, working, waiting gets a new stateSince each time, never earlier", () => {
+    const w1 = sess("a", "10:05", { state: "waiting", stateSince: iso("10:00") });
+    const s1 = step(emptySlotState(), [w1], "10:10");
+    expect(brainOf(s1, 0)).toStrictEqual(heldSince(1, "a", "waiting", iso("10:00")));
+    const run = sess("a", "10:12", { state: "working", stateSince: iso("10:12") });
+    const s2 = step(s1, [run], "10:13");
+    expect(brainOf(s2, 0)).toStrictEqual(heldSince(1, "a", "working", iso("10:12")));
+    const w2 = sess("a", "10:15", { state: "waiting", stateSince: iso("10:15") });
+    const s3 = step(s2, [w2], "10:16");
+    expect(brainOf(s3, 0)).toStrictEqual(heldSince(1, "a", "waiting", iso("10:15")));
+    // A session stamp older than the brain's previous stateSince never moves it back.
+    const w3 = sess("a", "10:17", { state: "standby", stateSince: iso("10:01") });
+    const s4 = step(s3, [w3], "10:18");
+    expect(brainOf(s4, 0)).toStrictEqual(heldSince(1, "a", "standby", iso("10:15")));
+  });
+});
