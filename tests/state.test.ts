@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
   type InstanceRecord,
+  InstanceRunningError,
   StateDirError,
   instancePath,
   isLive,
@@ -158,4 +159,52 @@ test("an unwritable state dir throws StateDirError naming the directory", async 
   expect(error).toBeInstanceOf(StateDirError);
   expect(error.exitCode).toBe(1);
   expect(error.message).toContain(path.dirname(instancePath(repoDir)));
+});
+
+test("instancePath(null) is <state-root>/magi/server.json", () => {
+  expect(instancePath(null)).toBe(path.join(tmp, "state", "magi", "server.json"));
+});
+
+test("a null-path record round-trips with repoPath null", async () => {
+  await writeInstance(record({ repoPath: null }));
+  const file = path.join(tmp, "state", "magi", "server.json");
+  expect(fs.existsSync(file)).toBe(true);
+  expect(JSON.parse(fs.readFileSync(file, "utf8"))).toStrictEqual(record({ repoPath: null }));
+  expect(await readInstance(null)).toStrictEqual(record({ repoPath: null }));
+});
+
+test("removeInstance(null, otherPid) keeps the file and removeInstance(null, pid) deletes it", async () => {
+  await writeInstance(record({ repoPath: null, pid: 100 }));
+  expect(removeInstance(null, 999)).toBe(false);
+  expect(fs.existsSync(instancePath(null))).toBe(true);
+  expect(removeInstance(null, 100)).toBe(true);
+  expect(fs.existsSync(instancePath(null))).toBe(false);
+});
+
+test("a null record and a repo record coexist without touching each other", async () => {
+  await writeInstance(record({ repoPath: null, pid: 100, port: 1111 }));
+  await writeInstance(record({ pid: 200, port: 2222 }));
+  expect(await readInstance(null)).toStrictEqual(record({ repoPath: null, pid: 100, port: 1111 }));
+  expect(await readInstance(repoDir)).toStrictEqual(record({ pid: 200, port: 2222 }));
+  expect(removeInstance(null, 100)).toBe(true);
+  expect(await readInstance(null)).toBeNull();
+  expect((await readInstance(repoDir))?.pid).toBe(200);
+});
+
+test("readInstance(null) is null when missing or when repoPath has the wrong type", async () => {
+  expect(await readInstance(null)).toBeNull();
+  const file = instancePath(null);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ ...record(), repoPath: 5 }));
+  expect(await readInstance(null)).toBeNull();
+});
+
+test("InstanceRunningError for a null path has the path-less message", () => {
+  const error = new InstanceRunningError(null, 4318);
+  expect(error.message).toBe("Agent Visualizer is already running at http://127.0.0.1:4318");
+});
+
+test("InstanceRunningError for a repo path keeps its message", () => {
+  const error = new InstanceRunningError("/a/app", 4318);
+  expect(error.message).toBe("Agent Visualizer is already running for /a/app at http://127.0.0.1:4318");
 });

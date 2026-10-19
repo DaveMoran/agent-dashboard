@@ -204,7 +204,7 @@ description: "Task list for 006-magi-slots"
 
 **Independent Test**: `tests/state.test.ts`, `tests/args.test.ts`, `tests/server.test.ts` (health), `tests/cli.e2e.test.ts`.
 
-- [ ] T011 [P] [US5] (tester → coder) Path-less instance record (`contracts/cli.md` "Instance record", research R1). Test file: `tests/state.test.ts` (add tests). Code: `src/server/state.ts`.
+- [X] T011 [P] [US5] (tester → coder) Path-less instance record (`contracts/cli.md` "Instance record", research R1). Test file: `tests/state.test.ts` (add tests). Code: `src/server/state.ts`.
   - `InstanceRecord.repoPath: string | null`.
   - `instancePath(repoPath: string | null)`: `null` → `path.join(stateRoot(), "magi", "server.json")`; a string → unchanged.
   - `writeInstance`, `readInstance(repoPath: string | null)` and `removeInstance(repoPath: string | null, pid)` work for `null`.
