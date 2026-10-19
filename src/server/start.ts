@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import type { HookStatus } from "../agents/attention/source.js";
 import type { AgentSource } from "../agents/source.js";
+import type { BrainView } from "../contract/magi.js";
 import { HOST } from "./constants.js";
 import { listenWithFallback } from "./port.js";
 import type { RepoTarget } from "./repo.js";
@@ -8,12 +9,13 @@ import { createHandler } from "./routes.js";
 import { version } from "./version.js";
 
 export type StartOptions = {
-  repo: RepoTarget;
+  repo: RepoTarget | null;
   port: number;
   webRoot?: string;
   devUi?: string;
   agentSource?: AgentSource;
   hookStatus?: () => HookStatus;
+  magi?: { brains(): BrainView[] };
 };
 
 export type RunningServer = {
@@ -34,6 +36,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     devUi: opts.devUi,
     agentSource: opts.agentSource,
     hookStatus: opts.hookStatus,
+    magi: opts.magi,
   });
   const { server, fellBack } = listenWithFallback(opts.port, (port) =>
     Bun.serve({ hostname: HOST, port, fetch }),

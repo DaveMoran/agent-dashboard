@@ -4,6 +4,7 @@ import { createAttentionSource } from "../agents/attention/source.js";
 import { compileMainAgentPattern } from "../agents/main-agent.js";
 import { transcriptsRoot } from "../agents/transcripts/discover.js";
 import { createTranscriptSource } from "../agents/transcripts/source.js";
+import { createMagiService } from "../magi/service.js";
 import { parseCliArgs, usageText } from "../server/args.js";
 import { adapters } from "../adapters/index.js";
 import { assertKnownAdapter, createRegistry } from "../core/registry.js";
@@ -34,14 +35,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  // parseCliArgs guarantees repoPath unless --help/--version, handled above.
-  const repo = await resolveRepoPath(options.repoPath as string);
+  const repo = options.repoPath === undefined ? null : await resolveRepoPath(options.repoPath);
 
-  const config = await loadConfig(repo.path);
+  const config = await loadConfig(repo?.path);
   const port = options.port ?? config.port ?? DEFAULT_PORT;
   assertKnownAdapter(config.adapter, createRegistry(adapters));
 
-  const existing = await readInstance(repo.path);
+  const existing = await readInstance(repo?.path ?? null);
   if (existing && (await isLive(existing))) {
     throw new InstanceRunningError(existing.repoPath, existing.port);
   }
@@ -59,6 +59,12 @@ async function main(): Promise<void> {
     eventsFile: path.join(stateRoot(), "hooks", "events.jsonl"),
   });
   await source.start();
+  const service = createMagiService({
+    source,
+    idleMs: (config.idleTimeoutMinutes ?? 30) * 60_000,
+    waitingMs: (config.waitingTimeoutMinutes ?? 240) * 60_000,
+  });
+  service.start();
 
   let server: Awaited<ReturnType<typeof startServer>>;
   try {
@@ -68,8 +74,10 @@ async function main(): Promise<void> {
       devUi: process.env.AGENT_VISUALIZER_DEV_UI,
       agentSource: source,
       hookStatus: () => source.hookStatus(),
+      magi: service,
     });
   } catch (error) {
+    service.stop();
     await source.stop();
     throw error;
   }
@@ -77,12 +85,13 @@ async function main(): Promise<void> {
     await writeInstance({
       port: server.port,
       pid: process.pid,
-      repoPath: repo.path,
+      repoPath: repo?.path ?? null,
       startedAt: new Date().toISOString(),
       version,
     });
   } catch (error) {
     await server.stop();
+    service.stop();
     await source.stop();
     throw error;
   }
@@ -92,21 +101,22 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     await server.stop();
+    service.stop();
     await source.stop();
-    removeInstance(repo.path, process.pid);
+    removeInstance(repo?.path ?? null, process.pid);
     process.exit(0);
   };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
   process.on("exit", () => {
-    removeInstance(repo.path, process.pid);
+    removeInstance(repo?.path ?? null, process.pid);
   });
 
   if (server.fellBack) {
     console.error(`Port ${server.requestedPort} is in use; using ${server.port}.`);
   }
   console.log(`Agent Visualizer ${version}`);
-  console.log(`Observing: ${repo.path}`);
+  console.log(`Observing: ${repo ? repo.path : "all Claude Code projects"}`);
   console.log(`Transcripts: ${root}`);
   console.log(`Listening: ${server.url}`);
 }

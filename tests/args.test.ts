@@ -53,10 +53,22 @@ test("--version needs no path", () => {
   });
 });
 
-test("missing path is a UsageError with exit code 2", () => {
-  const error = usageError([]);
-  expect(error.exitCode).toBe(2);
-  expect(error.message).toContain("Missing repository path");
+test("no arguments is valid and yields no repo path", () => {
+  expect(parseCliArgs([])).toStrictEqual({
+    repoPath: undefined,
+    port: undefined,
+    help: false,
+    version: false,
+  });
+});
+
+test("--port alone is valid and yields no repo path", () => {
+  expect(parseCliArgs(["--port", "5000"])).toStrictEqual({
+    repoPath: undefined,
+    port: 5000,
+    help: false,
+    version: false,
+  });
 });
 
 test.each([
@@ -90,7 +102,15 @@ test("two positionals is a UsageError", () => {
 });
 
 test("usage text documents the contract's synopsis and exit codes", () => {
-  expect(usageText).toContain("Usage: agent-visualizer <repo-path> [--port <n>]");
+  expect(usageText.split("\n")[0]).toBe("Usage: agent-visualizer [<repo-path>] [--port <n>]");
   expect(usageText).toContain("--help | --version");
   expect(usageText).toContain("Exit codes:");
+});
+
+test("usage text no longer lists a missing path as a usage error", () => {
+  expect(usageText).not.toContain("missing <repo-path>");
+});
+
+test("usage text lists an already running instance under exit code 1", () => {
+  expect(usageText).toContain("instance already running");
 });

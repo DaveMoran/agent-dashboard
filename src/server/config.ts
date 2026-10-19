@@ -8,6 +8,8 @@ export type Config = {
   adapter: string | undefined;
   mainAgentModel: string | undefined;
   transcriptsDir: string | undefined;
+  idleTimeoutMinutes: number | undefined;
+  waitingTimeoutMinutes: number | undefined;
   source: string | undefined;
 };
 
@@ -25,8 +27,9 @@ async function readIfPresent(file: string): Promise<string | undefined> {
   }
 }
 
-export async function loadConfig(repoPath: string, cwd: string = process.cwd()): Promise<Config> {
-  for (const dir of [repoPath, cwd]) {
+export async function loadConfig(repoPath: string | undefined, cwd: string = process.cwd()): Promise<Config> {
+  const dirs = repoPath === undefined ? [cwd] : [repoPath, cwd];
+  for (const dir of dirs) {
     const file = path.resolve(dir, CONFIG_FILE_NAME);
     const text = await readIfPresent(file);
     if (text === undefined) continue;
@@ -43,12 +46,15 @@ export async function loadConfig(repoPath: string, cwd: string = process.cwd()):
       throw new ConfigValueError(`Invalid config in ${file}: top level must be a JSON object`);
     }
 
-    const { port, adapter, mainAgentModel, transcriptsDir } = parsed as {
-      port?: unknown;
-      adapter?: unknown;
-      mainAgentModel?: unknown;
-      transcriptsDir?: unknown;
-    };
+    const { port, adapter, mainAgentModel, transcriptsDir, idleTimeoutMinutes, waitingTimeoutMinutes } =
+      parsed as {
+        port?: unknown;
+        adapter?: unknown;
+        mainAgentModel?: unknown;
+        transcriptsDir?: unknown;
+        idleTimeoutMinutes?: unknown;
+        waitingTimeoutMinutes?: unknown;
+      };
     if (port !== undefined) {
       if (typeof port !== "number" || !Number.isInteger(port) || port < 1 || port > 65535) {
         throw new ConfigValueError(
@@ -73,11 +79,23 @@ export async function loadConfig(repoPath: string, cwd: string = process.cwd()):
         );
       }
     }
+    for (const [name, value] of [
+      ["idleTimeoutMinutes", idleTimeoutMinutes],
+      ["waitingTimeoutMinutes", waitingTimeoutMinutes],
+    ] as const) {
+      if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value) || value <= 0)) {
+        throw new ConfigValueError(
+          `Invalid config in ${file}: "${name}" must be a positive number of minutes, got ${JSON.stringify(value)}`,
+        );
+      }
+    }
     return {
       port: port as number | undefined,
       adapter: adapter as string | undefined,
       mainAgentModel: mainAgentModel as string | undefined,
       transcriptsDir: transcriptsDir as string | undefined,
+      idleTimeoutMinutes: idleTimeoutMinutes as number | undefined,
+      waitingTimeoutMinutes: waitingTimeoutMinutes as number | undefined,
       source: file,
     };
   }
@@ -86,6 +104,8 @@ export async function loadConfig(repoPath: string, cwd: string = process.cwd()):
     adapter: undefined,
     mainAgentModel: undefined,
     transcriptsDir: undefined,
+    idleTimeoutMinutes: undefined,
+    waitingTimeoutMinutes: undefined,
     source: undefined,
   };
 }

@@ -88,12 +88,12 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-test("no args exits 2 with usage on stderr", async () => {
-  const { code, stdout, stderr } = await run([]);
+test("two positionals exit 2 with usage on stderr", async () => {
+  const { code, stdout, stderr } = await run([repoDir, repoDir]);
   expect(code).toBe(2);
   expect(stdout).toBe("");
-  expect(stderr).toContain("Missing repository path");
-  expect(stderr).toContain("Usage: agent-visualizer <repo-path> [--port <n>]");
+  expect(stderr).toContain("Too many positional arguments");
+  expect(stderr).toContain("Usage: agent-visualizer [<repo-path>] [--port <n>]");
 });
 
 test("missing repo path exits 1 and names the path", async () => {
@@ -126,7 +126,7 @@ test("unknown flag exits 2", async () => {
 test("--help exits 0 and prints usage to stdout", async () => {
   const { code, stdout, stderr } = await run(["--help"]);
   expect(code).toBe(0);
-  expect(stdout).toContain("Usage: agent-visualizer <repo-path> [--port <n>]");
+  expect(stdout).toContain("Usage: agent-visualizer [<repo-path>] [--port <n>]");
   expect(stderr).toBe("");
 });
 
@@ -514,4 +514,169 @@ test("startup output names the transcripts directory", async () => {
   child.kill("SIGINT");
   await child.exited;
   expect(out).toContain(`Transcripts: ${dir}\n`);
+});
+
+test("GET /api/magi answers 200 with three not-active brains when no sessions exist", async () => {
+  const port = await freePort();
+  const { child } = await startAndWait([repoDir, "--port", String(port)]);
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/magi`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toStrictEqual({
+      brains: [
+        { number: 1, name: "MELCHIOR", state: "not-active", stateSince: null, project: null },
+        { number: 2, name: "BALTHASAR", state: "not-active", stateSince: null, project: null },
+        { number: 3, name: "CASPER", state: "not-active", stateSince: null, project: null },
+      ],
+    });
+  } finally {
+    child.kill("SIGINT");
+    await child.exited;
+  }
+});
+
+const MAGI_RECORD = () => path.join(stateDir, "magi", "server.json");
+
+test("a no-argument start prints the all-projects line and a Listening line", async () => {
+  const port = await freePort();
+  const { child, out } = await startAndWait(["--port", String(port)]);
+  try {
+    expect(out.trimEnd().split("\n")).toEqual([
+      `Agent Visualizer ${pkg.version}`,
+      "Observing: all Claude Code projects",
+      `Transcripts: ${emptyTranscripts}`,
+      `Listening: http://127.0.0.1:${port}`,
+    ]);
+  } finally {
+    child.kill("SIGINT");
+    await child.exited;
+  }
+});
+
+test("a no-argument start writes magi/server.json with repoPath null and its pid", async () => {
+  const port = await freePort();
+  const { child } = await startAndWait(["--port", String(port)]);
+  try {
+    const record = JSON.parse(fs.readFileSync(MAGI_RECORD(), "utf8"));
+    expect(Object.keys(record).sort()).toEqual(["pid", "port", "repoPath", "startedAt", "version"]);
+    expect(record.repoPath).toBeNull();
+    expect(record.pid).toBe(child.pid);
+    expect(record.port).toBe(port);
+    expect(record.version).toBe(pkg.version);
+    // the path-less record does not live under instances/
+    expect(fs.existsSync(path.join(stateDir, "instances"))).toBe(false);
+  } finally {
+    child.kill("SIGINT");
+    await child.exited;
+  }
+});
+
+test("a no-argument start reports repoPath null and repoName null in health", async () => {
+  const port = await freePort();
+  const { child } = await startAndWait(["--port", String(port)]);
+  try {
+    const health = await (await fetch(`http://127.0.0.1:${port}/api/health`)).json();
+    expect(health).toEqual({
+      status: "ok",
+      repoPath: null,
+      repoName: null,
+      version: pkg.version,
+      attentionHook: { seen: false, lastEventAt: null },
+    });
+  } finally {
+    child.kill("SIGINT");
+    await child.exited;
+  }
+});
+
+test("a no-argument start serves /api/magi with three brains", async () => {
+  const port = await freePort();
+  const { child } = await startAndWait(["--port", String(port)]);
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/magi`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { brains: { number: number; name: string }[] };
+    expect(body.brains.map((b) => [b.number, b.name])).toEqual([
+      [1, "MELCHIOR"],
+      [2, "BALTHASAR"],
+      [3, "CASPER"],
+    ]);
+  } finally {
+    child.kill("SIGINT");
+    await child.exited;
+  }
+});
+
+test("a second no-argument start exits 1 with the path-less already-running message", async () => {
+  const port = await freePort();
+  const { child: first } = await startAndWait(["--port", String(port)]);
+  try {
+    const before = fs.readFileSync(MAGI_RECORD(), "utf8");
+    const second = await run(["--port", String(await freePort())]);
+    expect(second.code).toBe(1);
+    expect(second.stderr).toContain(`Agent Visualizer is already running at http://127.0.0.1:${port}`);
+    expect(second.stderr).not.toContain("already running for");
+    expect(fs.readFileSync(MAGI_RECORD(), "utf8")).toBe(before);
+    expect((await fetch(`http://127.0.0.1:${port}/api/health`)).status).toBe(200);
+  } finally {
+    first.kill("SIGINT");
+    await first.exited;
+  }
+});
+
+test("SIGINT stops a no-argument instance with exit 0 and removes magi/server.json", async () => {
+  const port = await freePort();
+  const { child } = await startAndWait(["--port", String(port)]);
+  expect(fs.existsSync(MAGI_RECORD())).toBe(true);
+  child.kill("SIGINT");
+  expect(await child.exited).toBe(0);
+  expect(fs.existsSync(MAGI_RECORD())).toBe(false);
+  await expect(fetch(`http://127.0.0.1:${port}/api/health`)).rejects.toThrow();
+});
+
+test("a stale magi/server.json (dead pid) does not block a no-argument start", async () => {
+  fs.mkdirSync(path.dirname(MAGI_RECORD()), { recursive: true });
+  fs.writeFileSync(
+    MAGI_RECORD(),
+    JSON.stringify({
+      port: await freePort(),
+      pid: 999999,
+      repoPath: null,
+      startedAt: "2020-01-01T00:00:00.000Z",
+      version: "0.0.0",
+    }),
+  );
+  const port = await freePort();
+  const { child } = await startAndWait(["--port", String(port)]);
+  try {
+    const record = JSON.parse(fs.readFileSync(MAGI_RECORD(), "utf8"));
+    expect(record.pid).toBe(child.pid);
+    expect(record.port).toBe(port);
+  } finally {
+    child.kill("SIGINT");
+    await child.exited;
+  }
+  expect(fs.existsSync(MAGI_RECORD())).toBe(false);
+});
+
+test("idleTimeoutMinutes 0 in the cwd config makes a no-argument start exit 1", async () => {
+  fs.writeFileSync(path.join(tmp, CONFIG_NAME), JSON.stringify({ idleTimeoutMinutes: 0 }));
+  const { code, stdout, stderr } = await run(["--port", String(await freePort())]);
+  expect(code).toBe(1);
+  expect(stdout).toBe("");
+  expect(stderr).toContain('"idleTimeoutMinutes" must be a positive number of minutes');
+  expect(fs.existsSync(MAGI_RECORD())).toBe(false);
+});
+
+test("a start with a path still uses the per-repo record and writes no magi/server.json", async () => {
+  const port = await freePort();
+  const { child } = await startAndWait([repoDir, "--port", String(port)]);
+  try {
+    const record = JSON.parse(fs.readFileSync(serverJsonPath(), "utf8"));
+    expect(record.repoPath).toBe(repoDir);
+    expect(fs.existsSync(MAGI_RECORD())).toBe(false);
+  } finally {
+    child.kill("SIGINT");
+    await child.exited;
+  }
 });

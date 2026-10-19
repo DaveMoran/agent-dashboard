@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-type Health = { status: string; repoPath: string; repoName: string; version: string };
+type Health = { status: string; repoPath: string | null; repoName: string | null; version: string };
 
 type State = { kind: "loading" } | { kind: "ready"; health: Health } | { kind: "error"; message: string };
 
@@ -33,8 +33,8 @@ export function App() {
   }
   return (
     <main>
-      <h1>{state.health.repoName}</h1>
-      <p>{state.health.repoPath}</p>
+      <h1>{state.health.repoName ?? "MAGI"}</h1>
+      {state.health.repoPath !== null && <p>{state.health.repoPath}</p>}
     </main>
   );
 }

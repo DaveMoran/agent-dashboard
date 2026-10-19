@@ -8,7 +8,7 @@ import { AppError } from "./errors.js";
 export type InstanceRecord = {
   port: number;
   pid: number;
-  repoPath: string;
+  repoPath: string | null;
   startedAt: string;
   version: string;
 };
@@ -16,8 +16,12 @@ export type InstanceRecord = {
 export class StateDirError extends AppError {}
 
 export class InstanceRunningError extends AppError {
-  constructor(repoPath: string, port: number) {
-    super(`Agent Visualizer is already running for ${repoPath} at http://${HOST}:${port}`);
+  constructor(repoPath: string | null, port: number) {
+    super(
+      repoPath === null
+        ? `Agent Visualizer is already running at http://${HOST}:${port}`
+        : `Agent Visualizer is already running for ${repoPath} at http://${HOST}:${port}`,
+    );
   }
 }
 
@@ -34,7 +38,8 @@ export function repoKey(repoPath: string): string {
   return `${slug}-${hash}`;
 }
 
-export function instancePath(repoPath: string): string {
+export function instancePath(repoPath: string | null): string {
+  if (repoPath === null) return path.join(stateRoot(), "magi", "server.json");
   return path.join(stateRoot(), "instances", repoKey(repoPath), "server.json");
 }
 
@@ -44,7 +49,7 @@ function isInstanceRecord(value: unknown): value is InstanceRecord {
   return (
     Number.isInteger(r.port) &&
     Number.isInteger(r.pid) &&
-    typeof r.repoPath === "string" &&
+    (typeof r.repoPath === "string" || r.repoPath === null) &&
     typeof r.startedAt === "string" &&
     typeof r.version === "string"
   );
@@ -65,7 +70,7 @@ export async function writeInstance(record: InstanceRecord): Promise<void> {
   }
 }
 
-export async function readInstance(repoPath: string): Promise<InstanceRecord | null> {
+export async function readInstance(repoPath: string | null): Promise<InstanceRecord | null> {
   let text: string;
   try {
     text = await fs.promises.readFile(instancePath(repoPath), "utf8");
@@ -84,7 +89,7 @@ export async function readInstance(repoPath: string): Promise<InstanceRecord | n
  * Deletes the record only if the on-disk pid equals `pid`. Synchronous so it can run
  * from a process "exit" handler. Returns whether a file was removed.
  */
-export function removeInstance(repoPath: string, pid: number): boolean {
+export function removeInstance(repoPath: string | null, pid: number): boolean {
   const file = instancePath(repoPath);
   try {
     const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf8"));

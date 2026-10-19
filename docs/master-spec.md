@@ -15,7 +15,7 @@ The tool is **dogfooded**: built with Spec Kit, so its own repo is the first liv
 | Role | Observe only in V1 (no orchestration). Control comes with the Agent SDK pivot (see Later) and needs a constitution amendment |
 | Scope | Up to three projects at once, one per brain. Projects are found from active Claude Code sessions; no repo path is needed. A fourth active project is not shown |
 | V1 scope | Only the three brains and their state (specs 004–008). Click-through, subagent details, spec board, graph, timeline and further adapters come later |
-| Brains | MELCHIOR (1), BALTHASAR (2), CASPER (3). A project takes the lowest free brain when its first main-agent session becomes active and keeps it while active; it is freed after all its main sessions end or idle past a timeout (default 30 min). No reshuffling |
+| Brains | MELCHIOR (1), BALTHASAR (2), CASPER (3). A project takes the lowest free brain when its first main-agent session becomes active and keeps it while active; it is freed once all its main sessions have ended or timed out. A `working` or `standby` main session with no activity for 30 min stops counting for its brain, a `waiting` one after 4 h (`idleTimeoutMinutes`, `waitingTimeoutMinutes`); a crashed session stops counting after its timeout. No reshuffling |
 | Project | The git common dir of a session's `cwd` (all worktrees of a repo are one project), or the `cwd` itself outside git |
 | Main agent | A session whose model matches a configurable regex (default `^claude-(opus|fable)`). Only main agents light up a brain; subagents and other sessions show inside their project |
 | Brain states | not active (no project): black, red lettering; standby (agent idle): green; working: slow green↔blue pulse (≥ 2 s per cycle, steady under reduced motion); waiting for the user: red. Always shown as text too. Combined over the project's main sessions: waiting > working > standby. A running subagent, background ones included, keeps its main session working |
@@ -35,7 +35,7 @@ The tool is **dogfooded**: built with Spec Kit, so its own repo is the first liv
 | Spec Kit worktree copies | The copy in the worktree that has the feature branch checked out wins; otherwise the path the user gave, then git's worktree order. A merged feature takes its tasks from `main` |
 | Watching | Recursive watch per root, filtered by adapter patterns; 150 ms quiet period, 2 s maximum delay; full snapshot per notification |
 | Default port | `4317`; `--port` > `agent-visualizer.config.json` > default. If taken, fall back to a free port and say so |
-| State directory | `~/.agent-visualizer/` (override with `AGENT_VISUALIZER_STATE_DIR`); never inside an observed repo. Per-repo instances use `instances/<repo-key>/server.json`; the no-path MAGI instance's location is decided in 006 |
+| State directory | `~/.agent-visualizer/` (override with `AGENT_VISUALIZER_STATE_DIR`); never inside an observed repo. Per-repo instances use `instances/<repo-key>/server.json`; the no-path MAGI instance uses `magi/server.json` |
 | Network binding | Loopback only (`127.0.0.1`) |
 | Dev mode | `bun run dev` runs Vite and the Bun server; the Bun server proxies HTTP to Vite and Vite's HMR WebSocket connects directly to the Vite port (5173) |
 
@@ -59,7 +59,7 @@ git log / branches ──► Git ingester + attribution ────────
 - *OpenSpec:* `openspec/changes/<id>/` (proposal.md, tasks.md); moved to archive → done.
 - *BMAD:* story files' `Status:` field (+ sprint status file if present); epics → grouping.
 
-**Transcript source:** polls every 500 ms (no file watching) and tails every session JSONL under `~/.claude/projects/`, including subagent transcripts; a subagent counts as running until it ends its turn or the main session records its task notification, and one that dies with neither stays running until 006's idle timeout; queued notification lines close subagents too, and a `continued-in` line ends a session; groups sessions into projects; records prompts, tool calls (Edit/Write → file-edit, Bash → bash/test-run), model, `cwd`, `gitBranch`, timestamps.
+**Transcript source:** polls every 500 ms (no file watching) and tails every session JSONL under `~/.claude/projects/`, including subagent transcripts; a subagent counts as running until it ends its turn or the main session records its task notification, and one that dies with neither stays running until 006's idle timeout (brain level); queued notification lines close subagents too, and a `continued-in` line ends a session; groups sessions into projects; records prompts, tool calls (Edit/Write → file-edit, Bash → bash/test-run), model, `cwd`, `gitBranch`, timestamps.
 
 **Attention hook source (005):** reads `<state-root>/hooks/events.jsonl`, written by the opt-in script `hooks/attention-hook.ts` (Bun, imports only `node:` modules, one atomic append per event, silent, always exit 0, stores no prompt or tool input). Event mapping:
 
@@ -81,6 +81,8 @@ Idle notifications are not subscribed and never count as waiting.
 *Sync/async split (R3):* wait-start hooks and `SessionEnd` are synchronous so their timestamp precedes the answer that ends the wait (and Claude Code may exit before a background hook runs); wait-end hooks are `"async": true` and add no turn latency.
 
 *Session end:* `SessionEnd` removes the session from the listing; later activity revives it. `bun run hook-settings` prints the settings snippet, and the visualizer never edits Claude Code settings. `/api/health` reports `attentionHook: { seen, lastEventAt }`.
+
+**Brain `stateSince` (006):** a brain's `stateSince` changes only when its state or project changes. When it is freed it is the time the project stopped being active (a timed-out session drops at `lastActivity + timeout`, an ended one at the time it was noticed). When a brain takes a project it is the latest session `stateSince` in the new state, raised to now (except on the first step after start, which keeps the sessions' own history). A brain free since start has `null`. See `specs/006-magi-slots/research.md` R5.
 
 **Attribution order:** git branch on transcript entry → spec ID mentioned in prompt/commit → edited files ∈ spec's artifact/likely-files → time window between status transitions.
 
