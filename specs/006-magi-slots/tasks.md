@@ -54,7 +54,7 @@ description: "Task list for 006-magi-slots"
   - In `tests/contract-boundary.test.ts` add `magi\/` to the `FORBIDDEN` pattern: `/(server\/|agents\/|core\/|adapters\/|git\/|magi\/)/`.
   - In `src/web/App.tsx` change the local `Health` type to `repoPath: string | null; repoName: string | null` so it type-checks. Leave the rendering change to T014.
   - Acceptance: `bun run verify` passes.
-- [ ] T003 [P] (tester → coder) Timeout config keys and optional repo path (`contracts/cli.md` "Config file", research R2/R8). Test file: `tests/config.test.ts` (add tests). Code: `src/server/config.ts`.
+- [X] T003 [P] (tester → coder) Timeout config keys and optional repo path (`contracts/cli.md` "Config file", research R2/R8). Test file: `tests/config.test.ts` (add tests). Code: `src/server/config.ts`.
   - `Config` gains `idleTimeoutMinutes: number | undefined` and `waitingTimeoutMinutes: number | undefined`. Both are `undefined` when absent and when no file is found.
   - Each, if present, must be `typeof === "number"`, `Number.isFinite`, and `> 0`. Otherwise throw `ConfigValueError` with the exact message `Invalid config in <file>: "<key>" must be a positive number of minutes, got <JSON.stringify(value)>`.
   - The signature becomes `loadConfig(repoPath: string | undefined, cwd = process.cwd())`. It searches `[repoPath, cwd]` when `repoPath` is given and `[cwd]` when it is `undefined`.

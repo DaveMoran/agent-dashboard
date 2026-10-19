@@ -27,6 +27,8 @@ test("no file returns undefined port and source", async () => {
     adapter: undefined,
     mainAgentModel: undefined,
     transcriptsDir: undefined,
+    idleTimeoutMinutes: undefined,
+    waitingTimeoutMinutes: undefined,
     source: undefined,
   });
 });
@@ -38,6 +40,8 @@ test("file in repo only", async () => {
     adapter: undefined,
     mainAgentModel: undefined,
     transcriptsDir: undefined,
+    idleTimeoutMinutes: undefined,
+    waitingTimeoutMinutes: undefined,
     source: path.join(repo, NAME),
   });
 });
@@ -49,6 +53,8 @@ test("file in cwd only", async () => {
     adapter: undefined,
     mainAgentModel: undefined,
     transcriptsDir: undefined,
+    idleTimeoutMinutes: undefined,
+    waitingTimeoutMinutes: undefined,
     source: path.join(cwd, NAME),
   });
 });
@@ -61,6 +67,8 @@ test("both present: repo wins, no merging", async () => {
     adapter: undefined,
     mainAgentModel: undefined,
     transcriptsDir: undefined,
+    idleTimeoutMinutes: undefined,
+    waitingTimeoutMinutes: undefined,
     source: path.join(repo, NAME),
   });
 });
@@ -125,6 +133,8 @@ test("unknown keys are ignored", async () => {
     adapter: undefined,
     mainAgentModel: undefined,
     transcriptsDir: undefined,
+    idleTimeoutMinutes: undefined,
+    waitingTimeoutMinutes: undefined,
     source: path.join(repo, NAME),
   });
 });
@@ -141,6 +151,8 @@ test("adapter is read from the same file as port", async () => {
     adapter: "some-adapter",
     mainAgentModel: undefined,
     transcriptsDir: undefined,
+    idleTimeoutMinutes: undefined,
+    waitingTimeoutMinutes: undefined,
     source: path.join(repo, NAME),
   });
 });
@@ -191,4 +203,78 @@ test.each(["mainAgentModel", "transcriptsDir"])(
 test("an invalid regex string for mainAgentModel loads without error", async () => {
   put(repo, '{"mainAgentModel": "("}');
   expect((await loadConfig(repo, cwd)).mainAgentModel).toBe("(");
+});
+
+test("idleTimeoutMinutes and waitingTimeoutMinutes are read, fractions allowed", async () => {
+  put(repo, '{"idleTimeoutMinutes": 10, "waitingTimeoutMinutes": 0.5}');
+  const config = await loadConfig(repo, cwd);
+  expect(config.idleTimeoutMinutes).toBe(10);
+  expect(config.waitingTimeoutMinutes).toBe(0.5);
+  expect(config.source).toBe(path.join(repo, NAME));
+});
+
+test("absent timeout keys are undefined, with and without a file", async () => {
+  put(repo, '{"port": 4410}');
+  const withFile = await loadConfig(repo, cwd);
+  expect(withFile.idleTimeoutMinutes).toBeUndefined();
+  expect(withFile.waitingTimeoutMinutes).toBeUndefined();
+  fs.rmSync(path.join(repo, NAME));
+  const noFile = await loadConfig(repo, cwd);
+  expect(noFile.idleTimeoutMinutes).toBeUndefined();
+  expect(noFile.waitingTimeoutMinutes).toBeUndefined();
+});
+
+test("only one timeout key set leaves the other undefined", async () => {
+  put(repo, '{"waitingTimeoutMinutes": 7}');
+  const config = await loadConfig(repo, cwd);
+  expect(config.idleTimeoutMinutes).toBeUndefined();
+  expect(config.waitingTimeoutMinutes).toBe(7);
+});
+
+for (const key of ["idleTimeoutMinutes", "waitingTimeoutMinutes"]) {
+  test.each(["0", "-1", '"30"', "null", "true"])(
+    `${key} %s throws ConfigValueError with the exact message`,
+    async (value) => {
+      put(repo, `{"${key}": ${value}}`);
+      const error = (await loadConfig(repo, cwd).catch((e: unknown) => e)) as Error;
+      expect(error).toBeInstanceOf(ConfigValueError);
+      expect(error.message).toBe(
+        `Invalid config in ${path.join(repo, NAME)}: "${key}" must be a positive number of minutes, got ${value}`,
+      );
+    },
+  );
+}
+
+test("a valid idle value does not excuse an invalid waiting value", async () => {
+  put(repo, '{"idleTimeoutMinutes": 5, "waitingTimeoutMinutes": 0}');
+  const error = (await loadConfig(repo, cwd).catch((e: unknown) => e)) as Error;
+  expect(error).toBeInstanceOf(ConfigValueError);
+  expect(error.message).toContain('"waitingTimeoutMinutes"');
+});
+
+test("loadConfig(undefined, cwd) reads the cwd file", async () => {
+  put(cwd, '{"port": 4411, "idleTimeoutMinutes": 3}');
+  const config = await loadConfig(undefined, cwd);
+  expect(config.port).toBe(4411);
+  expect(config.idleTimeoutMinutes).toBe(3);
+  expect(config.source).toBe(path.join(cwd, NAME));
+});
+
+test("loadConfig(undefined, emptyDir) returns all-undefined with no source", async () => {
+  expect(await loadConfig(undefined, cwd)).toStrictEqual({
+    port: undefined,
+    adapter: undefined,
+    mainAgentModel: undefined,
+    transcriptsDir: undefined,
+    idleTimeoutMinutes: undefined,
+    waitingTimeoutMinutes: undefined,
+    source: undefined,
+  });
+});
+
+test("loadConfig(undefined, cwd) does not look in the repo directory", async () => {
+  put(repo, '{"port": 4412}');
+  const config = await loadConfig(undefined, cwd);
+  expect(config.port).toBeUndefined();
+  expect(config.source).toBeUndefined();
 });
