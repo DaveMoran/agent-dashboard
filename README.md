@@ -18,14 +18,14 @@ bun run build      # builds the UI into dist/web (needed once before serving in 
 ## Usage
 
 ```sh
-agent-visualizer <repo-path> [--port <n>]
+agent-visualizer [<repo-path>] [--port <n>]
 agent-visualizer --help | --version
 ```
 
 Without installing anything globally, run it from this checkout:
 
 ```sh
-bun src/cli/index.ts <repo-path> [--port <n>]
+bun src/cli/index.ts [<repo-path>] [--port <n>]
 # or, because the file has a `#!/usr/bin/env bun` shebang and is executable:
 ./src/cli/index.ts <repo-path>
 ```
@@ -42,11 +42,15 @@ Listening: http://127.0.0.1:4317
 
 Open the `Listening` address in a browser. The server binds to `127.0.0.1` only.
 
+### Starting without a path
+
+The repo path is optional. With no argument (`bun run dev` or `agent-visualizer`) it prints `Observing: all Claude Code projects` and shows every active project. There is one path-less instance per machine; its record is at `~/.agent-visualizer/magi/server.json` (or under `AGENT_VISUALIZER_STATE_DIR`). A second path-less start exits 1 and prints `Agent Visualizer is already running at http://127.0.0.1:<port>`. The optional path only affects config lookup and the per-repo instance record.
+
 ### Flags
 
 | Argument | Description |
 |---|---|
-| `<repo-path>` | Directory to observe (required except with `--help`/`--version`). Relative, `~`-prefixed and symlinked paths are accepted; the real absolute path is used. |
+| `<repo-path>` | Optional. Directory to observe for config lookup and the per-repo instance record. Relative, `~`-prefixed and symlinked paths are accepted; the real absolute path is used. |
 | `--port <n>` | Preferred port, integer 1-65535. Default `4317`. If the port is taken, a free port is chosen and `Port <requested> is in use; using <actual>.` is printed to stderr. |
 | `--help` | Print usage to stdout and exit 0. |
 | `--version` | Print the version to stdout and exit 0. |
@@ -56,8 +60,8 @@ Open the `Listening` address in a browser. The server binds to `127.0.0.1` only.
 | Code | Meaning |
 |---|---|
 | 0 | Clean shutdown after SIGINT/SIGTERM, or `--help`/`--version` |
-| 1 | Runtime/environment failure: repo path not found, not a directory or unreadable; config file unparseable or invalid; state directory not writable; an instance is already running for this repo |
-| 2 | Usage error: missing `<repo-path>`, unknown flag, invalid `--port` |
+| 1 | Runtime/environment failure: repo path not found, not a directory or unreadable; config file unparseable or invalid; state directory not writable; an instance is already running for this repo (or the path-less instance) |
+| 2 | Usage error: unknown flag, invalid `--port`, more than one positional (a missing path is not an error) |
 
 Every non-zero exit prints a message to stderr naming the specific problem. For "already running" it includes the existing address.
 
@@ -65,10 +69,12 @@ Every non-zero exit prints a message to stderr naming the specific problem. For 
 
 | Request | Response |
 |---|---|
-| `GET /api/health` | `200` `{ "status": "ok", "repoPath": "...", "repoName": "...", "version": "...", "attentionHook": { "seen": false, "lastEventAt": null } }` (see [Attention hook](#attention-hook-optional)) |
+| `GET /api/health` | `200` `{ "status": "ok", "repoPath": "...", "repoName": "...", "version": "...", "attentionHook": { "seen": false, "lastEventAt": null } }`. `repoPath` and `repoName` are `null` when started without a path (see [Attention hook](#attention-hook-optional)) |
 | other methods on `/api/health` | `405` |
 | `GET /api/sessions` | `200` `SessionsResponse`: the projects with at least one main-agent session (see below) |
 | other methods on `/api/sessions` | `405` with `Allow: GET` |
+| `GET /api/magi` | `200` `MagiResponse`: the three brains and the project each holds (see below) |
+| other methods on `/api/magi` | `405` with `Allow: GET` |
 | any other `/api/...` path | `404` `{ "error": "not_found" }` |
 | anything else | the built UI from `dist/web` (unknown paths without a file extension fall back to `index.html`); `503` with a hint if the UI is not built |
 
@@ -104,13 +110,28 @@ Returns the Claude Code projects found in the transcripts and their main-agent s
 - `state` is `"working"`, `"standby"` or `"waiting"`. `"waiting"` needs the optional attention hook (below); without it no session is ever `waiting`, and for a waiting session `stateSince` is when the wait began. Sessions that have ended (hook `SessionEnd`) are not listed, and a project left with no sessions is not listed. A session is `working` or `standby` as follows: it is `working` after a prompt, tool call or tool result, until a final reply, a turn-end marker or an interrupt ends the turn. It is also `working` while any subagent is running, even if its own turn has ended.
 - `runningSubagents` counts the session's subagents that are still running, background ones included. A subagent counts as running while its own transcript says it is working and the main session has not recorded a completion notice for it.
 - `stateSince` is when the state last changed (`null` if unknown). `lastActivity` is the newest timestamp over the session and its subagent transcripts.
-- Known limitation: a subagent that dies with neither a final reply nor a completion notice keeps its session `working` until the idle timeout planned for spec 006.
+- Known limitation: a subagent that dies with neither a final reply nor a completion notice keeps its session `working` until `idleTimeoutMinutes` passes (spec 006); after that it stops counting for its brain.
+
+#### `GET /api/magi`
+
+Returns exactly three brains, ordered MELCHIOR (1), BALTHASAR (2), CASPER (3). Types are in `src/contract/magi.ts`. A project takes the lowest free brain when its first main-agent session becomes active and keeps it until it is freed; a fourth active project is queued and not shown. `state` is `not-active`, `standby`, `working` or `waiting` (waiting > working > standby over the project's main sessions). `project` is `null` exactly when the brain is `not-active`. `stateSince` is `null` only for a brain free since start.
+
+```json
+{
+  "brains": [
+    { "number": 1, "name": "MELCHIOR", "state": "working", "stateSince": "2026-10-18T10:05:00.000Z",
+      "project": { "id": "/Users/me/agent-visualizer/.git", "name": "agent-visualizer", "path": "/Users/me/agent-visualizer" } },
+    { "number": 2, "name": "BALTHASAR", "state": "not-active", "stateSince": null, "project": null },
+    { "number": 3, "name": "CASPER", "state": "not-active", "stateSince": null, "project": null }
+  ]
+}
+```
 
 ## Config file
 
 Optional `agent-visualizer.config.json`. The first file found wins (no merging):
 
-1. `<repo-path>/agent-visualizer.config.json`
+1. `<repo-path>/agent-visualizer.config.json` (only when a path was given)
 2. `./agent-visualizer.config.json` in the current working directory
 
 ```json
@@ -123,6 +144,10 @@ Optional `agent-visualizer.config.json`. The first file found wins (no merging):
 | `adapter` | non-empty string | Forces the named spec adapter instead of auto-detection. A value that is not a non-empty string, or a name that is not registered, exits 1 with a message (see [`docs/adapters.md`](docs/adapters.md)). |
 | `mainAgentModel` | non-empty string (regex) | Sessions whose model matches are main agents. Default `^claude-(opus|fable)`. A string that is not a valid regex does not stop startup: a warning naming the setting is printed to stderr and the default is used. |
 | `transcriptsDir` | non-empty string | Where Claude Code transcripts are read from. Default `~/.claude/projects`. `~/` expands to your home directory; a relative path is resolved against the directory of the config file. |
+| `idleTimeoutMinutes` | number > 0 | Default `30`. A `working` or `standby` main session with no activity for this long stops counting for its brain, so a crashed session does not hold a brain forever. |
+| `waitingTimeoutMinutes` | number > 0 | Default `240`. The same for a `waiting` session. |
+
+An invalid timeout exits 1 with `Invalid config in <file>: "<key>" must be a positive number of minutes, got <value>`.
 
 The environment variable `AGENT_VISUALIZER_TRANSCRIPTS_DIR` overrides `transcriptsDir`. The CLI prints the directory it reads as `Transcripts: <path>` on startup. The transcripts are polled every 500 ms; a missing directory is not an error and shows no sessions until it appears.
 
@@ -137,6 +162,8 @@ So other tools can find a running instance without scanning ports, each instance
 ```
 $AGENT_VISUALIZER_STATE_DIR/instances/<repo-key>/server.json
 ```
+
+A start without a repo path writes `$AGENT_VISUALIZER_STATE_DIR/magi/server.json` instead, with `"repoPath": null`.
 
 The state root defaults to `~/.agent-visualizer`. `<repo-key>` is the lowercase slug of the repo's directory name plus the first 8 hex characters of the SHA-1 of its absolute real path (for example `my-app-b9de9c68`). The directory is created with mode `0700`.
 

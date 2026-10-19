@@ -273,7 +273,7 @@ description: "Task list for 006-magi-slots"
 
 ## Phase 8: Polish, Documentation and PR
 
-- [ ] T016 (coder) Documentation (Principle II). Files: `README.md`, `docs/master-spec.md`.
+- [X] T016 (coder) Documentation (Principle II). Files: `README.md`, `docs/master-spec.md`.
   - `README.md`:
     - Starting with no path (`bun run dev` / `agent-visualizer` with no argument). One path-less instance per machine; its record is at `~/.agent-visualizer/magi/server.json` (or under `AGENT_VISUALIZER_STATE_DIR`). The optional repo path only affects config lookup and the per-repo record.
     - `GET /api/magi` with the example from `contracts/http-api.md`.
