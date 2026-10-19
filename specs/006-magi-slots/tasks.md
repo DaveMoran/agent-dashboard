@@ -76,7 +76,7 @@ description: "Task list for 006-magi-slots"
 
 **Independent Test**: `tests/magi-slots.test.ts` (pure, fake clock), `tests/magi-service.test.ts`, `tests/server.test.ts` (`/api/magi`).
 
-- [ ] T004 [US1] (tester → coder) Slot core. Test file: `tests/magi-slots.test.ts` (new). Code: `src/magi/slots.ts` (new). Implement `contracts/magi-service.md` "`src/magi/slots.ts`" except the `stateSince` rule (T010): for now every brain's `stateSince` is `null`. T004 tests must not assert `stateSince`; compare brains with `stateSince` left out, or use `expect.objectContaining`.
+- [X] T004 [US1] (tester → coder) Slot core. Test file: `tests/magi-slots.test.ts` (new). Code: `src/magi/slots.ts` (new). Implement `contracts/magi-service.md` "`src/magi/slots.ts`" except the `stateSince` rule (T010): for now every brain's `stateSince` is `null`. T004 tests must not assert `stateSince`; compare brains with `stateSince` left out, or use `expect.objectContaining`.
   - `BRAIN_NAMES = ["MELCHIOR", "BALTHASAR", "CASPER"] as const`.
   - `emptySlotState()`: three brains, numbers 1–3 with those names, `state: "not-active"`, `stateSince: null`, `project: null`; `prevLive` an empty `Map`; `started: false`.
   - `projectPath(id)`: `path.basename(id) === ".git" ? path.dirname(id) : id`. Use `node:path` only for string work, with no file access.
