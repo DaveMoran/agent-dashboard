@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { BrainView } from "../src/contract/magi.js";
 import { startServer } from "../src/server/start.js";
 import { version } from "../src/server/version.js";
 
@@ -32,6 +33,7 @@ async function start(
     webRoot?: string;
     devUi?: string;
     hookStatus?: () => { seen: boolean; lastEventAt: string | null };
+    magi?: { brains(): BrainView[] };
   } = {},
 ) {
   const server = await startServer({
@@ -40,6 +42,7 @@ async function start(
     webRoot: opts.webRoot ?? webRoot,
     devUi: opts.devUi,
     hookStatus: opts.hookStatus,
+    magi: opts.magi,
   });
   stops.push(server.stop);
   return server;
@@ -222,4 +225,97 @@ test("devUi unreachable returns 502 with the hint", async () => {
   expect(res.status).toBe(502);
   expect(await res.text()).toBe(`Vite dev server unreachable at ${closed}`);
   expect((await fetch(`${server.url}/api/health`)).status).toBe(200);
+});
+
+test("GET /api/magi with no magi service returns three not-active brains (T006)", async () => {
+  const server = await start();
+  const res = await fetch(`${server.url}/api/magi`);
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-type")).toContain("application/json");
+  expect(await res.json()).toStrictEqual({
+    brains: [
+      { number: 1, name: "MELCHIOR", state: "not-active", stateSince: null, project: null },
+      { number: 2, name: "BALTHASAR", state: "not-active", stateSince: null, project: null },
+      { number: 3, name: "CASPER", state: "not-active", stateSince: null, project: null },
+    ],
+  });
+});
+
+test("GET /api/magi returns exactly what the magi service reports (T006)", async () => {
+  const brains: BrainView[] = [
+    {
+      number: 1,
+      name: "MELCHIOR",
+      state: "working",
+      stateSince: "2026-10-18T10:05:00.000Z",
+      project: { id: "/x/a/.git", name: "a", path: "/x/a" },
+    },
+    {
+      number: 2,
+      name: "BALTHASAR",
+      state: "waiting",
+      stateSince: "2026-10-18T10:06:00.000Z",
+      project: { id: "/x/b/.git", name: "b", path: "/x/b" },
+    },
+    { number: 3, name: "CASPER", state: "not-active", stateSince: null, project: null },
+  ];
+  const server = await start({ magi: { brains: () => brains } });
+  const res = await fetch(`${server.url}/api/magi`);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toStrictEqual({ brains });
+});
+
+test("GET /api/magi calls the service on each request (T006)", async () => {
+  let state: BrainView["state"] = "standby";
+  const server = await start({
+    magi: {
+      brains: () => [
+        {
+          number: 1,
+          name: "MELCHIOR",
+          state,
+          stateSince: "2026-10-18T10:00:00.000Z",
+          project: { id: "/x/a/.git", name: "a", path: "/x/a" },
+        },
+        { number: 2, name: "BALTHASAR", state: "not-active", stateSince: null, project: null },
+        { number: 3, name: "CASPER", state: "not-active", stateSince: null, project: null },
+      ],
+    },
+  });
+  const first = (await (await fetch(`${server.url}/api/magi`)).json()) as { brains: BrainView[] };
+  expect(first.brains[0]?.state).toBe("standby");
+  state = "working";
+  const second = (await (await fetch(`${server.url}/api/magi`)).json()) as { brains: BrainView[] };
+  expect(second.brains[0]?.state).toBe("working");
+});
+
+test("POST /api/magi returns 405 with Allow: GET (T006)", async () => {
+  const server = await start();
+  const res = await fetch(`${server.url}/api/magi`, { method: "POST" });
+  expect(res.status).toBe(405);
+  expect(res.headers.get("allow")).toBe("GET");
+});
+
+test("/api/sessions and /api/health are unchanged when magi is wired (T006)", async () => {
+  const server = await start({
+    magi: {
+      brains: () => [
+        { number: 1, name: "MELCHIOR", state: "not-active", stateSince: null, project: null },
+        { number: 2, name: "BALTHASAR", state: "not-active", stateSince: null, project: null },
+        { number: 3, name: "CASPER", state: "not-active", stateSince: null, project: null },
+      ],
+    },
+  });
+  const health = await fetch(`${server.url}/api/health`);
+  expect(health.status).toBe(200);
+  expect(await health.json()).toEqual({
+    status: "ok",
+    repoPath: repoDir,
+    repoName: "demo-repo",
+    version,
+    attentionHook: { seen: false, lastEventAt: null },
+  });
+  const sessions = await fetch(`${server.url}/api/sessions`);
+  expect(sessions.status).toBe(200);
+  expect(await sessions.json()).toStrictEqual({ projects: [] });
 });

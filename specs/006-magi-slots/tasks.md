@@ -119,7 +119,7 @@ description: "Task list for 006-magi-slots"
     - With `tickMs: 10`, set `t` past the idle timeout and `await Bun.sleep(60)` with no events: MELCHIOR is not-active.
     - After `stop()`, emitting an event and sleeping past a tick changes nothing.
     - Mutating the array returned by `brains()` does not change the next `brains()`.
-- [ ] T006 [US1] (tester → coder) `/api/magi` route (`contracts/http-api.md`). Test file: `tests/server.test.ts` (add tests). Code: `src/server/routes.ts`, `src/server/start.ts`.
+- [X] T006 [US1] (tester → coder) `/api/magi` route (`contracts/http-api.md`). Test file: `tests/server.test.ts` (add tests). Code: `src/server/routes.ts`, `src/server/start.ts`.
   - `HandlerOptions` and `StartOptions` gain `magi?: { brains(): BrainView[] }`, and `startServer` passes it through.
   - `GET /api/magi` returns `Response.json({ brains } satisfies MagiResponse)`. With no `magi`, `brains` is the three brains of `emptySlotState()`.
   - Other methods get `405` with `Allow: GET`.

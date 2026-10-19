@@ -3,6 +3,8 @@ import * as path from "node:path";
 import type { HookStatus } from "../agents/attention/source.js";
 import type { AgentSource } from "../agents/source.js";
 import type { HealthResponse } from "../contract/health.js";
+import type { BrainView, MagiResponse } from "../contract/magi.js";
+import { emptySlotState } from "../magi/slots.js";
 import type { RepoTarget } from "./repo.js";
 import { buildSessionsResponse } from "./sessions.js";
 
@@ -13,6 +15,7 @@ export type HandlerOptions = {
   devUi?: string;
   agentSource?: AgentSource;
   hookStatus?: () => HookStatus;
+  magi?: { brains(): BrainView[] };
 };
 
 const UI_NOT_BUILT = "UI not built. Run `bun run build`.";
@@ -125,6 +128,14 @@ export function createHandler(opts: HandlerOptions): (req: Request) => Promise<R
         return new Response(null, { status: 405, headers: { Allow: "GET" } });
       }
       return Response.json(buildSessionsResponse(opts.agentSource?.sessions() ?? []));
+    }
+
+    if (url.pathname === "/api/magi") {
+      if (req.method !== "GET") {
+        return new Response(null, { status: 405, headers: { Allow: "GET" } });
+      }
+      const brains = opts.magi?.brains() ?? emptySlotState().brains;
+      return Response.json({ brains } satisfies MagiResponse);
     }
 
     if (url.pathname.startsWith("/api/")) {
