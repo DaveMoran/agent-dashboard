@@ -279,3 +279,94 @@ describe("purity", () => {
     expect(out2).toStrictEqual(out1);
   });
 });
+
+describe("US2 timeouts", () => {
+  const threeFree = [free(1), free(2), free(3)];
+
+  test("standby holds at exactly 30 min and frees 1 ms later (US2-2)", () => {
+    const a = sess("a", "10:00", { state: "standby" });
+    const s1 = step(emptySlotState(), [a], "10:00");
+    expect(view(step(s1, [a], "10:30"))[0]).toStrictEqual(held(1, "a", "standby"));
+    expect(view(step(s1, [a], "10:30:00.001"))).toStrictEqual(threeFree);
+  });
+
+  test("a project keeps its brain while another session of it ends (US2-3)", () => {
+    const x = sess("a", "10:20", { sessionId: "x", state: "standby" });
+    const y = sess("a", "10:25", { sessionId: "y", state: "standby" });
+    const s1 = step(emptySlotState(), [x, y], "10:26");
+    const s2 = step(s1, [y], "10:27");
+    expect(view(s2)).toStrictEqual([held(1, "a", "standby"), free(2), free(3)]);
+  });
+
+  test("a stale working session frees the brain (US2-4)", () => {
+    const a = sess("a", "10:00", { state: "working" });
+    const s1 = step(emptySlotState(), [a], "10:00");
+    expect(view(step(s1, [a], "10:30"))[0]).toStrictEqual(held(1, "a", "working"));
+    expect(view(step(s1, [a], "10:31"))).toStrictEqual(threeFree);
+  });
+
+  test("a timed-out working session does not count toward project state (US2-5)", () => {
+    const x = sess("a", "09:00", { sessionId: "x", state: "working" });
+    const y = sess("a", "10:20", { sessionId: "y", state: "standby" });
+    const out = step(emptySlotState(), [x, y], "10:30");
+    expect(view(out)).toStrictEqual([held(1, "a", "standby"), free(2), free(3)]);
+  });
+
+  test("a freed project with new activity takes the lowest free brain again (US2-6)", () => {
+    const a0 = sess("a", "10:00");
+    const b0 = sess("b", "10:00");
+    const s1 = step(emptySlotState(), [a0, b0], "10:00");
+    expect(view(s1)).toStrictEqual([held(1, "a", "standby"), held(2, "b", "standby"), free(3)]);
+    const b1 = sess("b", "10:30");
+    const s2 = step(s1, [a0, b1], "10:31");
+    expect(view(s2)).toStrictEqual([free(1), held(2, "b", "standby"), free(3)]);
+    const a1 = sess("a", "11:00");
+    const s3 = step(s2, [a1, b1], "11:00");
+    expect(view(s3)).toStrictEqual([held(1, "a", "standby"), held(2, "b", "standby"), free(3)]);
+  });
+
+  test("a freed project takes CASPER when another project took MELCHIOR first (US2-6)", () => {
+    const a0 = sess("a", "10:00");
+    const b0 = sess("b", "10:00");
+    const s1 = step(emptySlotState(), [a0, b0], "10:00");
+    const b1 = sess("b", "10:30");
+    const s2 = step(s1, [a0, b1], "10:31");
+    const c = sess("c", "10:40");
+    const s3 = step(s2, [a0, b1, c], "10:40");
+    expect(view(s3)).toStrictEqual([held(1, "c", "standby"), held(2, "b", "standby"), free(3)]);
+    const a1 = sess("a", "11:00");
+    const c1 = sess("c", "10:50");
+    const s4 = step(s3, [a1, b1, c1], "11:00");
+    expect(view(s4)).toStrictEqual([
+      held(1, "c", "standby"),
+      held(2, "b", "standby"),
+      held(3, "a", "standby"),
+    ]);
+  });
+
+  test("idleMs is configurable (US2-7)", () => {
+    const options: SlotOptions = { idleMs: 10 * MIN, waitingMs: 240 * MIN };
+    const a = sess("a", "10:00", { state: "standby" });
+    const s1 = stepSlots(emptySlotState(), [a], ms("10:00"), options);
+    expect(view(stepSlots(s1, [a], ms("10:10"), options))[0]).toStrictEqual(held(1, "a", "standby"));
+    expect(view(stepSlots(s1, [a], ms("10:11"), options))).toStrictEqual(threeFree);
+  });
+
+  test("a waiting session holds for 4 h and frees 1 ms later (US2-8, US2-9)", () => {
+    const a = sess("a", "10:00", { state: "waiting" });
+    const s1 = step(emptySlotState(), [a], "10:00");
+    expect(view(step(s1, [a], "10:45"))[0]).toStrictEqual(held(1, "a", "waiting"));
+    expect(view(step(s1, [a], "14:00"))[0]).toStrictEqual(held(1, "a", "waiting"));
+    expect(view(step(s1, [a], "14:00:00.001"))).toStrictEqual(threeFree);
+  });
+
+  test("an answered waiting session falls back to the idle timeout", () => {
+    const waiting = sess("a", "10:00", { state: "waiting" });
+    const s1 = step(emptySlotState(), [waiting], "10:00");
+    const answered = sess("a", "10:50", { state: "working" });
+    const s2 = step(s1, [answered], "10:50");
+    expect(view(s2)[0]).toStrictEqual(held(1, "a", "working"));
+    expect(view(step(s2, [answered], "11:20"))[0]).toStrictEqual(held(1, "a", "working"));
+    expect(view(step(s2, [answered], "11:20:00.001"))).toStrictEqual(threeFree);
+  });
+});

@@ -144,7 +144,7 @@ description: "Task list for 006-magi-slots"
 
 **Independent Test**: timeout scenarios in `tests/magi-slots.test.ts`, the tick in `tests/magi-service.test.ts`, and the real transcript source in `tests/magi-fixtures.test.ts`.
 
-- [ ] T008 [US2] (tester) Timeout scenarios. Test file: `tests/magi-slots.test.ts` (add a `describe("US2 timeouts")`). The code should already pass from T004; if a test fails, the planner sends it to a coder to fix `src/magi/slots.ts`.
+- [X] T008 [US2] (tester) Timeout scenarios. Test file: `tests/magi-slots.test.ts` (add a `describe("US2 timeouts")`). The code should already pass from T004; if a test fails, the planner sends it to a coder to fix `src/magi/slots.ts`.
   - `a` standby, last activity 10:00: at `now = 10:30` MELCHIOR holds `a`; at `10:30:00.001` it is not-active (US2-2).
   - `a` has two sessions; one ends (removed) while the other is live: `a` keeps MELCHIOR (US2-3).
   - `a` has one session `working`, last activity 10:00, and no other session: at `10:31` MELCHIOR is not-active (US2-4).
