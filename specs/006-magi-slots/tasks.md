@@ -216,7 +216,7 @@ description: "Task list for 006-magi-slots"
     - `removeInstance(null, otherPid)` keeps the file and `removeInstance(null, pid)` deletes it;
     - a `null` record and a repo record coexist without touching each other;
     - the `InstanceRunningError` message for `null` matches exactly.
-- [ ] T012 [P] [US5] (tester → coder) Optional path in args (`contracts/cli.md` "Usage", research R8). Test file: `tests/args.test.ts` (change the "missing path" test, add tests). Code: `src/server/args.ts`.
+- [X] T012 [P] [US5] (tester → coder) Optional path in args (`contracts/cli.md` "Usage", research R8). Test file: `tests/args.test.ts` (change the "missing path" test, add tests). Code: `src/server/args.ts`.
   - `parseCliArgs([])` returns `{ repoPath: undefined, port: undefined, help: false, version: false }`.
   - `parseCliArgs(["--port", "5000"])` returns port 5000 with no path.
   - Two positionals still throw `UsageError`.

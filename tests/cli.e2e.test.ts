@@ -88,12 +88,12 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-test("no args exits 2 with usage on stderr", async () => {
-  const { code, stdout, stderr } = await run([]);
+test("two positionals exit 2 with usage on stderr", async () => {
+  const { code, stdout, stderr } = await run([repoDir, repoDir]);
   expect(code).toBe(2);
   expect(stdout).toBe("");
-  expect(stderr).toContain("Missing repository path");
-  expect(stderr).toContain("Usage: agent-visualizer <repo-path> [--port <n>]");
+  expect(stderr).toContain("Too many positional arguments");
+  expect(stderr).toContain("Usage: agent-visualizer [<repo-path>] [--port <n>]");
 });
 
 test("missing repo path exits 1 and names the path", async () => {
@@ -126,7 +126,7 @@ test("unknown flag exits 2", async () => {
 test("--help exits 0 and prints usage to stdout", async () => {
   const { code, stdout, stderr } = await run(["--help"]);
   expect(code).toBe(0);
-  expect(stdout).toContain("Usage: agent-visualizer <repo-path> [--port <n>]");
+  expect(stdout).toContain("Usage: agent-visualizer [<repo-path>] [--port <n>]");
   expect(stderr).toBe("");
 });
 

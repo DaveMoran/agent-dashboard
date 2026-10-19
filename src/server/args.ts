@@ -8,19 +8,20 @@ export type CliOptions = {
   version: boolean;
 };
 
-export const usageText = `Usage: agent-visualizer <repo-path> [--port <n>]
+export const usageText = `Usage: agent-visualizer [<repo-path>] [--port <n>]
        agent-visualizer --help | --version
 
 Arguments:
-  <repo-path>    Directory to observe. Relative, ~-prefixed and symlinked paths accepted.
+  <repo-path>    Optional. Directory to observe for config lookup and the per-repo
+                 instance record. Brains always show every active project.
   --port <n>     Preferred port, integer 1-65535. Falls back to a free port if taken.
   --help         Print usage to stdout, exit 0.
   --version      Print the tool version to stdout, exit 0.
 
 Exit codes:
   0  Clean shutdown after SIGINT/SIGTERM, or --help/--version
-  1  Runtime/environment failure: repo path not found, not a directory, unreadable; config file unparseable or invalid; state dir not writable; instance already running for this repo
-  2  Usage error: missing <repo-path>, unknown flag, invalid --port
+  1  Runtime/environment failure: repo path not found, not a directory, unreadable; config file unparseable or invalid; state dir not writable; instance already running (for this repo, or the path-less instance)
+  2  Usage error: unknown flag, invalid --port, more than one <repo-path>
 
 Every non-zero exit prints a single message to stderr that names the specific problem and, for "already running", the existing address (http://127.0.0.1:<port>).`;
 
@@ -76,11 +77,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
       validatedPort = portNum;
     }
 
-    // Validate positional arguments
-    if (repoPath === undefined && !values.help && !values.version) {
-      throw new UsageError("Missing repository path. Use --help for usage information.");
-    }
-
+    // The repo path is optional; at most one is allowed.
     if (positionals.length > 1) {
       throw new UsageError(`Too many positional arguments. Expected 1, got ${positionals.length}.`);
     }
