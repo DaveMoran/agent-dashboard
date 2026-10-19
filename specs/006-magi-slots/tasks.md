@@ -286,7 +286,7 @@ description: "Task list for 006-magi-slots"
     - Add a short line on the brain `stateSince` rule (research R5) under Architecture.
     - Mark 004, 005 and 006 as *(shipped)* in "Feature specs" only if the planner says so at PR time; otherwise mark 006 only when merged.
   - Acceptance: `bun run verify` passes; every config key and the record path in the README match `contracts/cli.md`.
-- [ ] T017 (planner) Live and dogfood check per `quickstart.md` "Manual (live)" and "Dogfood check":
+- [X] T017 (planner) Live and dogfood check per `quickstart.md` "Manual (live)" and "Dogfood check":
   - no-path start;
   - this repo's Opus session on MELCHIOR going `working` ↔ `standby`;
   - a second project on BALTHASAR;
@@ -295,7 +295,7 @@ description: "Task list for 006-magi-slots"
   - the dead session `db3f06ca` not holding any brain.
 
   Record any spec gap found as a note in the PR. Fix only what the spec already requires.
-- [ ] T018 (planner) Final `bun run verify` and `bun run build`. Push the branch and open the PR: summary, link to `specs/006-magi-slots/`, the docs updated, and the live-check result.
+- [X] T018 (planner) Final `bun run verify` and `bun run build`. Push the branch and open the PR: summary, link to `specs/006-magi-slots/`, the docs updated, and the live-check result.
 
 ---
 
