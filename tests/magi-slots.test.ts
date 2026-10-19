@@ -476,3 +476,121 @@ describe("US3 stateSince", () => {
     expect(brainOf(s4, 0)).toStrictEqual(heldSince(1, "a", "standby", iso("10:15")));
   });
 });
+
+describe("US4 queue", () => {
+  const three = () => [sess("a", "10:01"), sess("b", "10:02"), sess("c", "10:03")];
+  /** Activate the sessions one at a time so they take brains 1, 2, 3 in list order. */
+  const seed = (sessions: AgentSession[], now: string): SlotState => {
+    let state = emptySlotState();
+    for (let i = 1; i <= sessions.length; i++) state = step(state, sessions.slice(0, i), now);
+    return state;
+  };
+  const holdsAll = [held(1, "a", "standby"), held(2, "b", "standby"), held(3, "c", "standby")];
+
+  test("a fourth active project takes no brain and is shown nowhere (US4-1)", () => {
+    const s1 = seed(three(), "10:04");
+    const s2 = step(s1, [...three(), sess("d", "10:05")], "10:06");
+    expect(view(s2)).toStrictEqual(holdsAll);
+    expect(s2.brains.some((b) => b.project?.id === "/d/.git")).toBe(false);
+  });
+
+  test("the most recently active queued project takes a freed brain (US4-2)", () => {
+    const d = sess("d", "10:05");
+    const e = sess("e", "10:07");
+    const [a, b, c] = three();
+    const s1 = seed([a, b, c], "10:08");
+    const s2 = step(s1, [a, b, c, d, e], "10:08");
+    expect(view(s2)).toStrictEqual(holdsAll);
+    const s3 = step(s2, [a, c, d, e], "10:09");
+    expect(view(s3)).toStrictEqual([
+      held(1, "a", "standby"),
+      held(2, "e", "standby"),
+      held(3, "c", "standby"),
+    ]);
+    expect(s3.brains.some((br) => br.project?.id === "/d/.git")).toBe(false);
+  });
+
+  test("a queued project that times out before any brain frees never takes one (US4-3)", () => {
+    const a = sess("a", "10:20");
+    const b = sess("b", "10:21");
+    const c = sess("c", "10:22");
+    const d = sess("d", "10:05");
+    const s1 = seed([a, b, c], "10:30");
+    const s1q = step(s1, [a, b, c, d], "10:30");
+    expect(view(s1q)).toStrictEqual(holdsAll);
+    // d expires at 10:35; a, b, c are still live at 10:36.
+    const s2 = step(s1q, [a, b, c, d], "10:36");
+    expect(view(s2)).toStrictEqual(holdsAll);
+    // b's session ends; d is still in the source list but no longer live.
+    const s3 = step(s2, [a, c, d], "10:37");
+    expect(view(s3)).toStrictEqual([held(1, "a", "standby"), free(2), held(3, "c", "standby")]);
+  });
+
+  test("a queued project that timed out and becomes active again competes again (US4-3)", () => {
+    const a = sess("a", "10:20");
+    const b = sess("b", "10:21");
+    const c = sess("c", "10:22");
+    const s1 = step(seed([a, b, c], "10:30"), [a, b, c, sess("d", "10:05")], "10:30");
+    const dAgain = sess("d", "10:36");
+    const s2 = step(s1, [a, c, dAgain], "10:36");
+    expect(view(s2)).toStrictEqual([
+      held(1, "a", "standby"),
+      held(2, "d", "standby"),
+      held(3, "c", "standby"),
+    ]);
+  });
+
+  test("the brain list always has three brains numbered 1-3 in name order (US4-4)", () => {
+    const sets: AgentSession[][] = [
+      [],
+      [sess("a", "10:01")],
+      three(),
+      [...three(), sess("d", "10:05"), sess("e", "10:06")],
+    ];
+    let state = emptySlotState();
+    for (const sessions of sets) {
+      state = step(state, sessions, "10:07");
+      expect(state.brains.length).toBe(3);
+      expect(state.brains.map((b) => b.number)).toStrictEqual([1, 2, 3]);
+      expect(state.brains.map((b) => b.name)).toStrictEqual(["MELCHIOR", "BALTHASAR", "CASPER"]);
+    }
+  });
+
+  test("four projects activating at once are served by most recent activity (FR-008)", () => {
+    const sessions = [sess("a", "10:01"), sess("b", "10:04"), sess("c", "10:03"), sess("d", "10:02")];
+    const next = step(emptySlotState(), sessions, "10:05");
+    expect(view(next)).toStrictEqual([
+      held(1, "b", "standby"),
+      held(2, "c", "standby"),
+      held(3, "d", "standby"),
+    ]);
+    expect(next.brains.some((b) => b.project?.id === "/a/.git")).toBe(false);
+  });
+
+  test("ties are broken by project id ascending and the step is deterministic (FR-008)", () => {
+    const x = sess("x", "10:10");
+    const y = sess("y", "10:10");
+    const first = step(emptySlotState(), [y, x], "10:11");
+    expect(view(first)).toStrictEqual([held(1, "x", "standby"), held(2, "y", "standby"), free(3)]);
+    const again = step(emptySlotState(), [y, x], "10:11");
+    expect(again).toStrictEqual(first);
+    const reversed = step(emptySlotState(), [x, y], "10:11");
+    expect(view(reversed)).toStrictEqual(view(first));
+  });
+
+  test("a freed brain and a newly active project compete with queued ones by activity (FR-007)", () => {
+    const a = sess("a", "10:06");
+    const b = sess("b", "10:07");
+    const c = sess("c", "10:08");
+    const d = sess("d", "10:05");
+    const f = sess("f", "10:09");
+    const s1 = step(seed([a, b, c], "10:09"), [a, b, c, d], "10:09");
+    expect(view(s1)).toStrictEqual(holdsAll);
+    const s2 = step(s1, [a, b, d, f], "10:10");
+    expect(view(s2)).toStrictEqual([
+      held(1, "a", "standby"),
+      held(2, "b", "standby"),
+      held(3, "f", "standby"),
+    ]);
+  });
+});

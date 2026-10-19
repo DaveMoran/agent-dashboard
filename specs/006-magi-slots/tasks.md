@@ -258,7 +258,7 @@ description: "Task list for 006-magi-slots"
 
 **Independent Test**: `describe("US4 queue")` in `tests/magi-slots.test.ts`.
 
-- [ ] T015 [US4] (tester) Queue scenarios. Test file: `tests/magi-slots.test.ts` (add `describe("US4 queue")`). The code should already pass from T004 (research R4); if not, the planner sends the failures to a coder to fix `src/magi/slots.ts`.
+- [X] T015 [US4] (tester) Queue scenarios. Test file: `tests/magi-slots.test.ts` (add `describe("US4 queue")`). The code should already pass from T004 (research R4); if not, the planner sends the failures to a coder to fix `src/magi/slots.ts`.
   - `a`, `b`, `c` on 1–3; `d` becomes active: brains unchanged, and `d` appears in no brain (US4-1).
   - Queued `d` (last activity 10:05) and `e` (10:07); `b`'s only session is removed: `e` takes BALTHASAR, `d` stays hidden (US4-2).
   - Queued `d` times out before any brain frees; then `b` frees: BALTHASAR stays not-active (US4-3).
