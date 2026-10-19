@@ -4,6 +4,7 @@ import { createAttentionSource } from "../agents/attention/source.js";
 import { compileMainAgentPattern } from "../agents/main-agent.js";
 import { transcriptsRoot } from "../agents/transcripts/discover.js";
 import { createTranscriptSource } from "../agents/transcripts/source.js";
+import { createMagiService } from "../magi/service.js";
 import { parseCliArgs, usageText } from "../server/args.js";
 import { adapters } from "../adapters/index.js";
 import { assertKnownAdapter, createRegistry } from "../core/registry.js";
@@ -59,6 +60,12 @@ async function main(): Promise<void> {
     eventsFile: path.join(stateRoot(), "hooks", "events.jsonl"),
   });
   await source.start();
+  const service = createMagiService({
+    source,
+    idleMs: (config.idleTimeoutMinutes ?? 30) * 60_000,
+    waitingMs: (config.waitingTimeoutMinutes ?? 240) * 60_000,
+  });
+  service.start();
 
   let server: Awaited<ReturnType<typeof startServer>>;
   try {
@@ -68,8 +75,10 @@ async function main(): Promise<void> {
       devUi: process.env.AGENT_VISUALIZER_DEV_UI,
       agentSource: source,
       hookStatus: () => source.hookStatus(),
+      magi: service,
     });
   } catch (error) {
+    service.stop();
     await source.stop();
     throw error;
   }
@@ -83,6 +92,7 @@ async function main(): Promise<void> {
     });
   } catch (error) {
     await server.stop();
+    service.stop();
     await source.stop();
     throw error;
   }
@@ -92,6 +102,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     await server.stop();
+    service.stop();
     await source.stop();
     removeInstance(repo.path, process.pid);
     process.exit(0);

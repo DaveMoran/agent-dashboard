@@ -515,3 +515,22 @@ test("startup output names the transcripts directory", async () => {
   await child.exited;
   expect(out).toContain(`Transcripts: ${dir}\n`);
 });
+
+test("GET /api/magi answers 200 with three not-active brains when no sessions exist", async () => {
+  const port = await freePort();
+  const { child } = await startAndWait([repoDir, "--port", String(port)]);
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/magi`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toStrictEqual({
+      brains: [
+        { number: 1, name: "MELCHIOR", state: "not-active", stateSince: null, project: null },
+        { number: 2, name: "BALTHASAR", state: "not-active", stateSince: null, project: null },
+        { number: 3, name: "CASPER", state: "not-active", stateSince: null, project: null },
+      ],
+    });
+  } finally {
+    child.kill("SIGINT");
+    await child.exited;
+  }
+});

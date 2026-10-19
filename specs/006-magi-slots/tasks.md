@@ -128,7 +128,7 @@ description: "Task list for 006-magi-slots"
     - with a stub `magi` returning a fixed array, the body equals that array;
     - `POST` gives `405` with `Allow: GET`;
     - `/api/sessions` and `/api/health` are unchanged.
-- [ ] T007 [US1] (tester → coder) CLI wiring of the service. Test file: `tests/cli.e2e.test.ts` (add one test). Code: `src/cli/index.ts`.
+- [X] T007 [US1] (tester → coder) CLI wiring of the service. Test file: `tests/cli.e2e.test.ts` (add one test). Code: `src/cli/index.ts`.
   - After `source.start()`, create `createMagiService({ source, idleMs: (config.idleTimeoutMinutes ?? 30) * 60_000, waitingMs: (config.waitingTimeoutMinutes ?? 240) * 60_000 })` and call `start()`. Pass `magi: service` to `startServer`.
   - Call `service.stop()` before `source.stop()` in every path that stops the source: start failure, `writeInstance` failure and `shutdown`.
   - Pass `repo.path` to `loadConfig` as now (the path is still required until T013/T014).
