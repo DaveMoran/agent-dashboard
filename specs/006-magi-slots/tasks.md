@@ -40,7 +40,7 @@ description: "Task list for 006-magi-slots"
 
 ## Phase 1: Setup
 
-- [ ] T001 (planner) Run `git branch --show-current` (expect `006-magi-slots`) and `bun run verify` (expect all existing tests to pass) to confirm a green baseline. No commit.
+- [X] T001 (planner) Run `git branch --show-current` (expect `006-magi-slots`) and `bun run verify` (expect all existing tests to pass) to confirm a green baseline. No commit.
 
 ---
 
@@ -48,7 +48,7 @@ description: "Task list for 006-magi-slots"
 
 **Purpose**: contract types and the timeout config keys.
 
-- [ ] T002 [P] (coder) Contract types. Files: `src/contract/magi.ts` (new), `src/contract/health.ts`, `tests/contract-boundary.test.ts`.
+- [X] T002 [P] (coder) Contract types. Files: `src/contract/magi.ts` (new), `src/contract/health.ts`, `tests/contract-boundary.test.ts`.
   - Create `src/contract/magi.ts` exactly as in `contracts/http-api.md`. It exports `BrainState`, `BrainName`, `BrainProject`, `BrainView` and `MagiResponse`, starts with the comment `// Types for GET /api/magi. This file must import nothing.` and has no imports.
   - In `src/contract/health.ts` change `repoPath` and `repoName` to `string | null`.
   - In `tests/contract-boundary.test.ts` add `magi\/` to the `FORBIDDEN` pattern: `/(server\/|agents\/|core\/|adapters\/|git\/|magi\/)/`.

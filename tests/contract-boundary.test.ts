@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const FORBIDDEN = /(server\/|agents\/|core\/|adapters\/|git\/)/;
+const FORBIDDEN = /(server\/|agents\/|core\/|adapters\/|git\/|magi\/)/;
 
 export function forbiddenImports(source: string): string[] {
   const found: string[] = [];

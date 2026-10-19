@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-type Health = { status: string; repoPath: string; repoName: string; version: string };
+type Health = { status: string; repoPath: string | null; repoName: string | null; version: string };
 
 type State = { kind: "loading" } | { kind: "ready"; health: Health } | { kind: "error"; message: string };
 
