@@ -33,8 +33,8 @@ export function App() {
   }
   return (
     <main>
-      <h1>{state.health.repoName}</h1>
-      <p>{state.health.repoPath}</p>
+      <h1>{state.health.repoName ?? "MAGI"}</h1>
+      {state.health.repoPath !== null && <p>{state.health.repoPath}</p>}
     </main>
   );
 }

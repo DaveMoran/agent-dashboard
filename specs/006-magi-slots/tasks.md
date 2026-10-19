@@ -226,7 +226,7 @@ description: "Task list for 006-magi-slots"
   - `HandlerOptions.repo` and `StartOptions.repo` become `RepoTarget | null`.
   - Health returns `repoPath: opts.repo?.path ?? null` and `repoName: opts.repo?.name ?? null`.
   - Tests: with `repo: null` the health body `toStrictEqual`s `{ status: "ok", repoPath: null, repoName: null, version, attentionHook: { seen: false, lastEventAt: null } }`; with a repo it is unchanged.
-- [ ] T014 [US5] (tester → coder) CLI path-less start and UI fallback (`contracts/cli.md`, research R8). Test file: `tests/cli.e2e.test.ts` (add tests). Code: `src/cli/index.ts`, `src/web/App.tsx`.
+- [X] T014 [US5] (tester → coder) CLI path-less start and UI fallback (`contracts/cli.md`, research R8). Test file: `tests/cli.e2e.test.ts` (add tests). Code: `src/cli/index.ts`, `src/web/App.tsx`.
   - `src/cli/index.ts`:
     - `const repo = options.repoPath === undefined ? null : await resolveRepoPath(options.repoPath)`;
     - `loadConfig(repo?.path)`;
