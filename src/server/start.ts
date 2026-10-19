@@ -9,7 +9,7 @@ import { createHandler } from "./routes.js";
 import { version } from "./version.js";
 
 export type StartOptions = {
-  repo: RepoTarget;
+  repo: RepoTarget | null;
   port: number;
   webRoot?: string;
   devUi?: string;

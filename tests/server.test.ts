@@ -319,3 +319,30 @@ test("/api/sessions and /api/health are unchanged when magi is wired (T006)", as
   expect(sessions.status).toBe(200);
   expect(await sessions.json()).toStrictEqual({ projects: [] });
 });
+
+test("GET /api/health with repo: null reports null repoPath and repoName (T013, R7)", async () => {
+  const server = await startServer({ repo: null, port: 0, webRoot });
+  stops.push(server.stop);
+  const res = await fetch(`${server.url}/api/health`);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toStrictEqual({
+    status: "ok",
+    repoPath: null,
+    repoName: null,
+    version,
+    attentionHook: { seen: false, lastEventAt: null },
+  });
+});
+
+test("GET /api/health with a repo keeps its path and name (T013)", async () => {
+  const server = await startServer({ repo: { path: repoDir, name: "demo-repo" }, port: 0, webRoot });
+  stops.push(server.stop);
+  const res = await fetch(`${server.url}/api/health`);
+  expect(await res.json()).toStrictEqual({
+    status: "ok",
+    repoPath: repoDir,
+    repoName: "demo-repo",
+    version,
+    attentionHook: { seen: false, lastEventAt: null },
+  });
+});

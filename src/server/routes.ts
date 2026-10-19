@@ -9,7 +9,7 @@ import type { RepoTarget } from "./repo.js";
 import { buildSessionsResponse } from "./sessions.js";
 
 export type HandlerOptions = {
-  repo: RepoTarget;
+  repo: RepoTarget | null;
   version: string;
   webRoot: string;
   devUi?: string;
@@ -115,8 +115,8 @@ export function createHandler(opts: HandlerOptions): (req: Request) => Promise<R
       }
       const body: HealthResponse = {
         status: "ok",
-        repoPath: opts.repo.path,
-        repoName: opts.repo.name,
+        repoPath: opts.repo?.path ?? null,
+        repoName: opts.repo?.name ?? null,
         version: opts.version,
         attentionHook: opts.hookStatus?.() ?? { seen: false, lastEventAt: null },
       };

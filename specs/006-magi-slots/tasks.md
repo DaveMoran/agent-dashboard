@@ -222,7 +222,7 @@ description: "Task list for 006-magi-slots"
   - Two positionals still throw `UsageError`.
   - Update `usageText` to the "Usage" block of `contracts/cli.md`. Its first line must be `Usage: agent-visualizer [<repo-path>] [--port <n>]`. In the exit-code list, remove "missing <repo-path>" from code 2 and add "instance already running" (path-less) to code 1.
   - Tests assert the first usage line exactly and that `usageText` no longer contains `missing <repo-path>`.
-- [ ] T013 [US5] (tester → coder) Nullable repo in routes and health (`contracts/http-api.md` "GET /api/health", research R7). Test file: `tests/server.test.ts` (add tests). Code: `src/server/routes.ts`, `src/server/start.ts`.
+- [X] T013 [US5] (tester → coder) Nullable repo in routes and health (`contracts/http-api.md` "GET /api/health", research R7). Test file: `tests/server.test.ts` (add tests). Code: `src/server/routes.ts`, `src/server/start.ts`.
   - `HandlerOptions.repo` and `StartOptions.repo` become `RepoTarget | null`.
   - Health returns `repoPath: opts.repo?.path ?? null` and `repoName: opts.repo?.name ?? null`.
   - Tests: with `repo: null` the health body `toStrictEqual`s `{ status: "ok", repoPath: null, repoName: null, version, attentionHook: { seen: false, lastEventAt: null } }`; with a repo it is unchanged.
