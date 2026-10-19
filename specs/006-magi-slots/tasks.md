@@ -153,7 +153,7 @@ description: "Task list for 006-magi-slots"
   - With `idleMs = 10 * 60_000`, a standby session silent for 11 min is not live (US2-7).
   - `a` `waiting`, last activity 10:00: at `10:45` MELCHIOR holds `a` with state `waiting`; at `14:00` still held; at `14:00:00.001` not-active (US2-8, US2-9).
   - `a` `waiting` since 10:00, answered at 10:50 (now `working`, last activity 10:50): live at `11:20`, not live at `11:20:00.001`.
-- [ ] T009 [P] [US2] (tester) Fixture test through the real transcript source. Test file: `tests/magi-fixtures.test.ts` (new).
+- [X] T009 [P] [US2] (tester) Fixture test through the real transcript source. Test file: `tests/magi-fixtures.test.ts` (new).
   - Materialize `fixtures/transcripts/two-worktrees` and `fixtures/transcripts/non-main` with `materializeTranscripts` from `tests/transcript-fixtures.ts`, using the variables they need (see `fixtures/transcripts/README.md` and how `tests/transcript-fixture-scenarios.test.ts` builds its git repo and worktree with `tests/git-helpers.ts`).
   - Create `createTranscriptSource({ root, mainAgentPattern: /^claude-(opus|fable)/ })`, `await start()`, and run a `createMagiService` with an injected `now` and `refresh()`. No ticking is needed; use a large `tickMs`. Stop both in `afterEach`.
   - `two-worktrees` (repo session working, last activity `2026-10-15T10:05:...`; worktree session standby, last activity 10:02):
