@@ -10,5 +10,5 @@
     "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "scripts", "fixtures", "vite.config.ts"]
+  "include": ["src", "tests", "scripts", "hooks", "fixtures", "vite.config.ts"]
 }

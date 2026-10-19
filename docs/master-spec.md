@@ -61,6 +61,27 @@ git log / branches ──► Git ingester + attribution ────────
 
 **Transcript source:** polls every 500 ms (no file watching) and tails every session JSONL under `~/.claude/projects/`, including subagent transcripts; a subagent counts as running until it ends its turn or the main session records its task notification, and one that dies with neither stays running until 006's idle timeout; queued notification lines close subagents too, and a `continued-in` line ends a session; groups sessions into projects; records prompts, tool calls (Edit/Write → file-edit, Bash → bash/test-run), model, `cwd`, `gitBranch`, timestamps.
 
+**Attention hook source (005):** reads `<state-root>/hooks/events.jsonl`, written by the opt-in script `hooks/attention-hook.ts` (Bun, imports only `node:` modules, one atomic append per event, silent, always exit 0, stores no prompt or tool input). Event mapping:
+
+| Hook event | Matcher | Meaning | Belongs to |
+|---|---|---|---|
+| `PermissionRequest` | all | wait starts | `agent_id` if present, else main |
+| `PreToolUse` | `AskUserQuestion\|ExitPlanMode` | wait starts | `agent_id` or main |
+| `Elicitation` | all | wait starts | `agent_id` or main |
+| `PostToolUse`, `PostToolUseFailure` | `AskUserQuestion\|ExitPlanMode` | wait ends | `agent_id` or main |
+| `ElicitationResult` | all | wait ends | `agent_id` or main |
+| `UserPromptSubmit`, `Stop`, `StopFailure` | none | wait ends | main |
+| `SubagentStop` | none | wait ends | that subagent |
+| `SessionEnd` | none | session ends | session |
+
+Idle notifications are not subscribed and never count as waiting.
+
+*Per-agent rule (FR-008):* a wait belongs to the agent that raised it (main or one subagent). A main session is `waiting` while any of its agents has a wait later than every end signal for that same agent. End signals for an agent are a later turn entry in its own transcript (bookkeeping entries do not count), its hook "done" events, and for a subagent its completion notice in the main transcript. One agent's signals never end another's wait. Combined order of read passes does not change the result.
+
+*Sync/async split (R3):* wait-start hooks and `SessionEnd` are synchronous so their timestamp precedes the answer that ends the wait (and Claude Code may exit before a background hook runs); wait-end hooks are `"async": true` and add no turn latency.
+
+*Session end:* `SessionEnd` removes the session from the listing; later activity revives it. `bun run hook-settings` prints the settings snippet, and the visualizer never edits Claude Code settings. `/api/health` reports `attentionHook: { seen, lastEventAt }`.
+
 **Attribution order:** git branch on transcript entry → spec ID mentioned in prompt/commit → edited files ∈ spec's artifact/likely-files → time window between status transitions.
 
 ## Views

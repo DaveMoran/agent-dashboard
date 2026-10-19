@@ -460,3 +460,114 @@ test("live-shapes: queued notification closes a subagent, continued-in ends a se
   expect(bySession(env, id("a"))).toMatchObject({ state: "working", runningSubagents: 1, isMain: true });
   expect(bySession(env, id("b"))).toMatchObject({ state: "standby", runningSubagents: 0, isMain: true });
 });
+
+test("clears: tool-calls has main at its last line and no subagents", async () => {
+  const env = await setup("tool-calls");
+  expect(env.source.clears(id("2"))).toStrictEqual({
+    main: "2026-10-15T10:01:01.000Z",
+    subagents: {},
+    lastTurnAt: "2026-10-15T10:01:01.000Z",
+  });
+});
+
+test("clears: background-subagents has all three agents, completion beats the last line", async () => {
+  const env = await setup("background-subagents");
+  expect(env.source.clears(id("4"))).toStrictEqual({
+    main: "2026-10-15T10:02:06.000Z",
+    subagents: {
+      a0000000000000001: "2026-10-15T10:00:20.000Z",
+      a0000000000000002: "2026-10-15T10:02:00.000Z",
+      a0000000000000003: "2026-10-15T10:00:40.000Z",
+    },
+    lastTurnAt: "2026-10-15T10:02:06.000Z",
+  });
+});
+
+test("clears: unknown session id is undefined", async () => {
+  const env = await setup("tool-calls");
+  expect(env.source.clears("nope")).toBeUndefined();
+});
+
+test("clears follows new turn lines and ignores bookkeeping lines", async () => {
+  const env = await setup("tool-calls");
+  const file = fileOf(env.root, ".jsonl");
+  appendLine(file, other(id("2"), env.REPO, "11:00:00"));
+  await env.source.refresh();
+  expect(env.source.clears(id("2"))!.main).toBe("2026-10-15T10:01:01.000Z");
+  appendLine(file, prompt(id("2"), env.REPO, "11:00:01"));
+  await env.source.refresh();
+  expect(env.source.clears(id("2"))).toStrictEqual({
+    main: T("11:00:01"),
+    subagents: {},
+    lastTurnAt: T("11:00:01"),
+  });
+});
+
+test("onActivity: called once per session per pass with new lines, not on an idle pass", async () => {
+  const env = await setup("tool-calls");
+  const calls: string[] = [];
+  env.source.onActivity((sid) => calls.push(sid));
+  const file = fileOf(env.root, ".jsonl");
+  appendLine(file, prompt(id("2"), env.REPO, "11:00:00"));
+  appendLine(file, final(id("2"), env.REPO, "11:00:01"));
+  await env.source.refresh();
+  expect(calls).toStrictEqual([id("2")]);
+  await env.source.refresh();
+  expect(calls).toStrictEqual([id("2")]);
+});
+
+test("onActivity: a subagent-only append reports the parent session", async () => {
+  const env = await setup("background-subagents");
+  const calls: string[] = [];
+  env.source.onActivity((sid) => calls.push(sid));
+  appendLine(
+    fileOf(env.root, "agent-a0000000000000003.jsonl"),
+    JSON.stringify({
+      type: "assistant",
+      timestamp: T("10:30:00"),
+      sessionId: id("4"),
+      cwd: env.REPO,
+      isSidechain: true,
+      agentId: "a0000000000000003",
+      message: {
+        id: "z",
+        model: "claude-sonnet-5-5",
+        stop_reason: "end_turn",
+        content: [{ type: "text", text: "done" }],
+      },
+    }),
+  );
+  await env.source.refresh();
+  expect(calls).toStrictEqual([id("4")]);
+});
+
+test("onActivity: unsubscribe stops calls, other listeners keep going, a throwing listener is isolated", async () => {
+  const env = await setup("tool-calls");
+  const a: string[] = [];
+  const b: string[] = [];
+  env.source.onActivity(() => {
+    throw new Error("boom");
+  });
+  const off = env.source.onActivity((sid) => a.push(sid));
+  env.source.onActivity((sid) => b.push(sid));
+  const file = fileOf(env.root, ".jsonl");
+  appendLine(file, prompt(id("2"), env.REPO, "11:00:00"));
+  await env.source.refresh();
+  expect(a).toStrictEqual([id("2")]);
+  expect(b).toStrictEqual([id("2")]);
+  off();
+  appendLine(file, prompt(id("2"), env.REPO, "11:00:01"));
+  await env.source.refresh();
+  expect(a).toStrictEqual([id("2")]);
+  expect(b).toStrictEqual([id("2"), id("2")]);
+});
+
+test("onActivity: nothing is called after stop()", async () => {
+  const env = await setup("tool-calls");
+  const calls: string[] = [];
+  env.source.onActivity((sid) => calls.push(sid));
+  appendLine(fileOf(env.root, ".jsonl"), prompt(id("2"), env.REPO, "11:00:00"));
+  await env.source.stop();
+  await env.source.refresh().catch(() => {});
+  expect(calls).toStrictEqual([]);
+});

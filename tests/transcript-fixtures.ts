@@ -18,6 +18,12 @@ export async function materializeTranscripts(
   vars: Record<string, string>,
 ): Promise<string> {
   const root = await copyFixture(path.join("transcripts", scenario));
+  fillPlaceholders(root, vars);
+  return root;
+}
+
+/** Replace {{NAME}} placeholders in every .jsonl under root; throws if a name has no value. */
+export function fillPlaceholders(root: string, vars: Record<string, string>): void {
   for (const file of jsonlFiles(root)) {
     const text = readFileSync(file, "utf8");
     const filled = text.replace(/\{\{([A-Za-z0-9_]+)\}\}/g, (_m, name: string) => {
@@ -28,7 +34,6 @@ export async function materializeTranscripts(
     });
     writeFileSync(file, filled);
   }
-  return root;
 }
 
 export function appendLine(file: string, line: string): void {

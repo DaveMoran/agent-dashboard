@@ -65,7 +65,7 @@ Every non-zero exit prints a message to stderr naming the specific problem. For 
 
 | Request | Response |
 |---|---|
-| `GET /api/health` | `200` `{ "status": "ok", "repoPath": "...", "repoName": "...", "version": "..." }` |
+| `GET /api/health` | `200` `{ "status": "ok", "repoPath": "...", "repoName": "...", "version": "...", "attentionHook": { "seen": false, "lastEventAt": null } }` (see [Attention hook](#attention-hook-optional)) |
 | other methods on `/api/health` | `405` |
 | `GET /api/sessions` | `200` `SessionsResponse`: the projects with at least one main-agent session (see below) |
 | other methods on `/api/sessions` | `405` with `Allow: GET` |
@@ -101,7 +101,7 @@ Returns the Claude Code projects found in the transcripts and their main-agent s
 
 - A **project** is the git common dir of a session's `cwd`, so all worktrees of a repo are one project; outside git it is the `cwd` itself.
 - Only **main-agent** sessions are listed: those whose model matches `mainAgentModel` (see Config file).
-- `state` is `"working"` or `"standby"`. A session is `working` after a prompt, tool call or tool result, until a final reply, a turn-end marker or an interrupt ends the turn. It is also `working` while any subagent is running, even if its own turn has ended.
+- `state` is `"working"`, `"standby"` or `"waiting"`. `"waiting"` needs the optional attention hook (below); without it no session is ever `waiting`, and for a waiting session `stateSince` is when the wait began. Sessions that have ended (hook `SessionEnd`) are not listed, and a project left with no sessions is not listed. A session is `working` or `standby` as follows: it is `working` after a prompt, tool call or tool result, until a final reply, a turn-end marker or an interrupt ends the turn. It is also `working` while any subagent is running, even if its own turn has ended.
 - `runningSubagents` counts the session's subagents that are still running, background ones included. A subagent counts as running while its own transcript says it is working and the main session has not recorded a completion notice for it.
 - `stateSince` is when the state last changed (`null` if unknown). `lastActivity` is the newest timestamp over the session and its subagent transcripts.
 - Known limitation: a subagent that dies with neither a final reply nor a completion notice keeps its session `working` until the idle timeout planned for spec 006.
@@ -167,13 +167,74 @@ Spec data reaches the app through adapters, one per spec framework, all mapping 
 | `bun run build` | Builds the UI to `dist/web`. |
 | `bun test` | Runs the unit, integration and end-to-end tests (they use temp directories and a temp state dir, never your real `~/.agent-visualizer`). |
 | `bun run live-check [repo-path]` | Scans a repo (default: this one) with the Spec Kit adapter and prints its roots, specs and issues. Read-only; not part of `bun test`. |
+| `bun run hook-settings` | Prints the attention hook settings snippet with absolute paths. Prints only; see [Attention hook](#attention-hook-optional). |
 | `bun run lint` | Biome lint and format check; fails on warnings. |
 | `bun run lint:fix` | Applies Biome's safe lint fixes and formatting. |
 | `bun run verify` | Lint (`bun run lint`), type check (`tsc --noEmit`) and `bun test`. Run this before calling work done. |
 
+## Attention hook (optional)
+
+Transcripts show whether a session is `working` or `standby`, but not that Claude Code is stopped on a question for you. An optional hook closes that gap: with it installed, a session shows `waiting` (red) while Claude Code waits for you to answer a permission prompt, an `AskUserQuestion` question, plan approval (`ExitPlanMode`) or an MCP elicitation. Without it nothing is ever `waiting`, and everything else works as before. Idle notifications ("Claude is waiting for your input") do not count as waiting; that is just a finished turn, which is `standby`.
+
+**Agent Visualizer never edits your Claude Code settings or hooks.** You add the hook yourself, and you can remove it the same way.
+
+### Install
+
+```sh
+bun run hook-settings
+```
+
+This prints a `hooks` block to stdout, with absolute paths to your `bun` and to `hooks/attention-hook.ts` in this checkout, and writes no file. Merge it into `~/.claude/settings.json`: if you already have a `hooks` key, add these events to it (an event that already exists takes another entry in its array). A trimmed example of the output:
+
+```json
+{
+  "hooks": {
+    "PermissionRequest": [
+      { "hooks": [{ "type": "command", "command": "<BUN> <REPO>/hooks/attention-hook.ts" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "AskUserQuestion|ExitPlanMode", "hooks": [{ "type": "command", "command": "<BUN> <REPO>/hooks/attention-hook.ts" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "<BUN> <REPO>/hooks/attention-hook.ts", "async": true }] }
+    ]
+  }
+}
+```
+
+The real output lists eleven events. Events that start a wait (and `SessionEnd`) run synchronously, so their line is written before the answer that ends the wait. Events that end a wait run with `"async": true` and add no delay to your turns. Sessions started after the change pick the hooks up; in a session that was already running, open `/hooks` to check they are loaded.
+
+### What it writes
+
+The hook appends one line per event to `~/.agent-visualizer/hooks/events.jsonl` (`$AGENT_VISUALIZER_STATE_DIR/hooks/events.jsonl` if that is set):
+
+```json
+{"ts":"2026-10-15T10:00:00.123Z","session":"0c303220-f66d-480c-8db7-9afc189a2260","cwd":"/Users/me/repo","event":"PermissionRequest","type":"Bash","agent":"aabcc9e032d23a66b"}
+```
+
+Only the timestamp, session id, working directory, event name, a type (tool name or notification type) and, inside a subagent, the agent id. It never records prompt text or tool input. The script prints nothing and always exits 0, so it cannot disturb Claude Code. The file is never rotated and you can delete it at any time; the visualizer only reads it.
+
+### Waits belong to one agent
+
+A wait belongs to the agent that raised it. If a subagent hits a permission prompt, its main session turns `waiting` and stays so until that subagent's own work resumes or it finishes. Other subagents working meanwhile do not clear it, and a wait in the main agent is not cleared by a subagent's progress.
+
+### Check it works
+
+With the visualizer running and a Claude Code session active, trigger a prompt, then:
+
+```sh
+curl http://127.0.0.1:4317/api/health
+```
+
+`attentionHook.seen` becomes `true` once any valid hook line has been read, and `lastEventAt` is the newest one's timestamp. If it stays `false`, check the paths in your settings and that `bun` runs from them.
+
+### Remove
+
+Delete the entries that point at `attention-hook.ts` from `~/.claude/settings.json`. Optionally delete `~/.agent-visualizer/hooks/`.
+
 ## Read-only guarantee
 
-Agent Visualizer only reads the repo it is pointed at. All state it writes (`server.json`) goes to the state directory above, never into the repo. Claude Code transcripts under `transcriptsDir` are only read, never written. An end-to-end test snapshots the repo directory before start and after shutdown and asserts they are identical.
+Agent Visualizer only reads the repo it is pointed at. All state it writes (`server.json`) goes to the state directory above, never into the repo. Claude Code transcripts under `transcriptsDir` are only read, never written. The attention hook is a separate script that you install yourself; it writes only to the state directory, and the visualizer only reads its events file. An end-to-end test snapshots the repo directory before start and after shutdown and asserts they are identical.
 
 ## Project structure
 
@@ -189,6 +250,10 @@ src/server/start.ts    Bun.serve wrapper (startServer)
 src/server/errors.ts   AppError (exit 1) and UsageError (exit 2)
 src/contract/          Shared types between server and UI (`sessions.ts`); imports nothing from the server
 src/agents/            Agent sources: the source interface, main-agent rule, and `transcripts/` (Claude Code JSONL tailing, session state, subagents)
+src/agents/attention/  Attention source: reads the hook events file, maps events to per-agent waits
+src/contract/health.ts Typed `/api/health` response, including `attentionHook`
+hooks/attention-hook.ts  The opt-in hook script Claude Code runs (Bun, writes events.jsonl)
+scripts/hook-settings.ts `bun run hook-settings`: prints the settings snippet, writes nothing
 src/core/              Shared spec model, adapter contract, validation, registry, scan and watcher (no framework names)
 src/git/               Read-only git access (runGit, worktree roots)
 src/adapters/          Registered spec adapters (`index.ts`)

@@ -1,0 +1,3 @@
+{"ts":"2026-10-15T10:00:00.500Z","session":"a0050000-0000-0000-0000-000000000002","cwd":"{{REPO}}","event":"PreToolUse","type":"Bash"}
+{"ts":"2026-10-15T10:00:01.200Z","session":"a0050000-0000-0000-0000-000000000002","cwd":"{{REPO}}","event":"PreToolUse","type":"AskUserQuestion"}
+{"ts":"2026-10-15T10:00:20.000Z","session":"a0050000-0000-0000-0000-000000000002","cwd":"{{REPO}}","event":"PostToolUse","type":"AskUserQuestion"}
