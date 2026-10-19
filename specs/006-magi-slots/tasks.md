@@ -105,7 +105,7 @@ description: "Task list for 006-magi-slots"
     - State combination in one project: `standby` + `working` gives `working`; `working` + `waiting` gives `waiting`; `standby` + `standby` gives `standby` (US3-1..3).
     - A session that left `sessions()` (ended) frees its brain at the next step (US2-1).
     - `stepSlots` does not mutate `prev` (deep-equal `prev` before and after), and the same inputs give `toStrictEqual` outputs.
-- [ ] T005 [US1] (tester → coder) MAGI service. Test file: `tests/magi-service.test.ts` (new). Code: `src/magi/service.ts` (new). Implement `contracts/magi-service.md` "`src/magi/service.ts`".
+- [X] T005 [US1] (tester → coder) MAGI service. Test file: `tests/magi-service.test.ts` (new). Code: `src/magi/service.ts` (new). Implement `contracts/magi-service.md` "`src/magi/service.ts`".
   - `createMagiService({ source, idleMs, waitingMs, now = Date.now, tickMs = 1000 })` keeps a `SlotState` (starts `emptySlotState()`).
   - `start()` subscribes to `source`, runs one step and starts `setInterval(step, tickMs)`.
   - Each source event runs one step with `source.sessions()` and `now()`.
